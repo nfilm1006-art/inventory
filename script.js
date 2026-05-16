@@ -1,5 +1,5 @@
 // ==================== SEKTOR 1: AUTHENTICATION (LOGIN SYSTEMS) ====================
-const ADMIN_USERNAME = 'admin';
+const ADMIN_USERNAME = 'Admin';
 const ADMIN_PASSWORD = 'gesnt123';
 
 // Cek status session login saat pertama kali halaman dimuat
