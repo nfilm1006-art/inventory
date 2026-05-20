@@ -1,5 +1,5 @@
 // ==================== SEKTOR 1: AUTHENTICATION (LOGIN SYSTEMS) ====================
-const ADMIN_USERNAME = "admin";
+const ADMIN_USERNAME = "Admin";
 const ADMIN_PASSWORD = "gesnt123";
 
 let isLoggedIn = localStorage.getItem("gudang_session") === "true";
