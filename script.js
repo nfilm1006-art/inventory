@@ -50,7 +50,7 @@ document.getElementById("btnLogout").addEventListener("click", () => {
 const placeholderImg = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><rect width='18' height='18' x='3' y='3' rx='2' ry='2'/><circle cx='9' cy='9' r='2'/><path d='m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21'/></svg>";
 
 const initialInventory = [
-  { id: '1', nama: 'Kabel Belden CAT5', stok: 25, minimalStok: 10, rak: 'RAK A-1 Depo', foto: placeholderImg },
+  { id: '1', nama: 'Kabel Belden Cat5', stok: 220, minimalStok: 10, rak: 'RAK A-1 Depo', foto: placeholderImg },
   { id: '2', nama: 'Mur 14', stok: 4, minimalStok: 12, rak: 'Rak B-2 501', foto: placeholderImg },
   { id: '3', nama: 'Cat semprot putih', stok: 30, minimalStok: 5, rak: 'Rak C-1 501', foto: placeholderImg },
 ];
@@ -89,6 +89,8 @@ function renderAplikasi() {
   const badgeAlert = document.getElementById('badgeAlert');
   const kontainerLog = document.getElementById('kontainerLog');
   
+  if (!tabelBodi) return; // Keamanan jika elemen belum siap
+  
   tabelBodi.innerHTML = '';
   kontainerNotifikasi.innerHTML = '';
   kontainerLog.innerHTML = '';
@@ -97,28 +99,39 @@ function renderAplikasi() {
   products.forEach(item => {
     const isKritis = Number(item.stok) <= Number(item.minimalStok);
     
+    // BERHASIL DIPERBAIKI: Baris deklarasi elemen tr dipasang kembali di sini
     const tr = document.createElement('tr');
     tr.className = 'hover:bg-slate-750 transition-colors border-b border-slate-700/50';
     tr.innerHTML = `
-      <td class="px-6 py-3 whitespace-nowrap">
-        <img src="${item.foto || placeholderImg}" alt="${item.nama}" class="w-12 h-12 object-cover rounded-lg bg-slate-900 border border-slate-700 shadow-inner" />
+      <td class="px-4 py-3 text-left whitespace-nowrap">
+        <img src="${item.foto || placeholderImg}" alt="${item.nama}" class="w-10 h-10 md:w-12 md:h-12 object-cover rounded-lg bg-slate-900 border border-slate-700 shadow-inner" />
       </td>
-      <td class="px-6 py-3 font-medium text-white">${item.nama}</td>
-      <td class="px-6 py-3 text-center"><span class="font-mono bg-slate-900 px-2 py-0.5 rounded text-slate-400 text-xs">${item.rak}</span></td>
-      <td class="px-6 py-3 text-center">
-        <span class="px-3 py-1 rounded-full font-bold text-xs ${isKritis ? 'bg-red-500/20 text-red-400 border border-red-500/30' : 'bg-emerald-500/20 text-emerald-400'}">
+      <td class="px-4 py-3 font-medium text-white text-left break-words">
+        ${item.nama}
+      </td>
+      <td class="px-4 py-3 text-center whitespace-nowrap">
+        <span class="font-mono bg-slate-900 px-2.5 py-1 rounded text-slate-400 text-[11px] md:text-xs border border-slate-700/50">
+          ${item.rak}
+        </span>
+      </td>
+      <td class="px-4 py-3 text-center whitespace-nowrap">
+        <span class="px-3 py-1 rounded-full font-bold text-[11px] md:text-xs inline-block ${isKritis ? 'bg-red-500/20 text-red-400 border border-red-500/30' : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'}">
           ${item.stok} Pcs
         </span>
       </td>
-      <td class="px-6 py-3 text-center text-slate-400">${item.minimalStok} Pcs</td>
-      <td class="px-6 py-3 text-center">
-        <div class="flex justify-center gap-1">
-          <button data-id="${item.id}" data-aksi="kurang" class="bg-slate-700 hover:bg-slate-600 text-white text-xs px-2.5 py-1 rounded transition font-bold">-1</button>
-          <button data-id="${item.id}" data-aksi="tambah" class="bg-slate-700 hover:bg-slate-600 text-white text-xs px-2.5 py-1 rounded transition font-bold">+1</button>
+      <td class="px-4 py-3 text-center text-slate-400 font-medium whitespace-nowrap">
+        ${item.minimalStok} Pcs
+      </td>
+      <td class="px-4 py-3 text-center whitespace-nowrap">
+        <div class="flex justify-center gap-1.5">
+          <button data-id="${item.id}" data-aksi="kurang" class="bg-slate-700 hover:bg-slate-600 active:scale-95 text-white text-xs px-2.5 py-1 rounded transition font-bold select-none">-1</button>
+          <button data-id="${item.id}" data-aksi="tambah" class="bg-slate-700 hover:bg-slate-600 active:scale-95 text-white text-xs px-2.5 py-1 rounded transition font-bold select-none">+1</button>
         </div>
       </td>
-      <td class="px-6 py-3 text-center">
-        <button data-id="${item.id}" data-aksi="hapus" class="bg-red-600/20 hover:bg-red-600 text-red-400 hover:text-white text-xs px-3 py-1.5 rounded transition border border-red-500/20 flex items-center gap-1 mx-auto">🗑️ Hapus</button>
+      <td class="px-4 py-3 text-center whitespace-nowrap">
+        <button data-id="${item.id}" data-aksi="hapus" class="bg-red-600/20 hover:bg-red-600 text-red-400 hover:text-white text-xs px-2.5 py-1.5 rounded transition border border-red-500/20 flex items-center justify-center mx-auto select-none">
+          🗑️
+        </button>
       </td>
     `;
     tabelBodi.appendChild(tr);
@@ -134,12 +147,12 @@ function renderAplikasi() {
           <span class="text-[9px] text-red-400 block mt-0.5 font-mono">LIVE MONITORING</span>
         </div>
       `;
-      kontainerNotifikasi.appendChild(alertDiv);
+      if (kontainerNotifikasi) kontainerNotifikasi.appendChild(alertDiv);
     }
   });
 
-  badgeAlert.innerText = `${jumlahAlert} Terdeteksi`;
-  if (jumlahAlert === 0) {
+  if (badgeAlert) badgeAlert.innerText = `${jumlahAlert} Terdeteksi`;
+  if (jumlahAlert === 0 && kontainerNotifikasi) {
     kontainerNotifikasi.innerHTML = `<div class="text-center text-slate-500 pt-10 text-sm"><p>✅ Stok aman terkendali.</p></div>`;
   }
 
@@ -150,7 +163,7 @@ function renderAplikasi() {
       <span class="break-all pr-2">➡️ ${log.teks}</span>
       <span class="text-slate-500 shrink-0">${log.waktu}</span>
     `;
-    kontainerLog.appendChild(logDiv);
+    if (kontainerLog) kontainerLog.appendChild(logDiv);
   });
 }
 
@@ -279,41 +292,35 @@ document.getElementById('btnDownloadExcel').addEventListener('click', () => {
     return;
   }
 
-  // Persiapan Struktur Data Kolom Excel
   const barisExcel = [
-    ["WAKTU", "AKTIVITAS / PERUBAHAN SISTEM", "KETERANGAN PENGGUNAAN"] // Header Excel
+    ["WAKTU", "AKTIVITAS / PERUBAHAN SISTEM", "KETERANGAN PENGGUNAAN"] 
   ];
 
-  // Memecah teks log untuk memisahkan bagian '[Ket: ...]' ke kolom tersendiri
   logs.forEach(log => {
     let teksAktivitas = log.teks;
     let teksKeterangan = "-";
 
-    // Mencari pattern teks [Ket: ...] menggunakan Regex baku
     const regexKet = /\[Ket:\s*(.*?)\]/;
     const cocok = teksAktivitas.match(regexKet);
 
     if (cocok) {
-      teksKeterangan = cocok[1]; // Ambil isi dalam kurung siku
-      teksAktivitas = teksAktivitas.replace(regexKet, "").trim(); // Bersihkan teks utama dari kode kurung
+      teksKeterangan = cocok[1]; 
+      teksAktivitas = teksAktivitas.replace(regexKet, "").trim(); 
     }
 
     barisExcel.push([log.waktu, teksAktivitas, teksKeterangan]);
   });
 
-  // Membuka engine pembuat spreadsheet SheetJS
   const lembarKerja = XLSX.utils.aoa_to_sheet(barisExcel);
   const bukuKerja = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(bukuKerja, lembarKerja, "Log Aktivitas");
 
-  // Atur lebar otomatis tiap kolom supaya tidak terpotong
   lembarKerja["!cols"] = [
-    { wch: 15 }, // Kolom Waktu
-    { wch: 55 }, // Kolom Aktivitas
-    { wch: 35 }  // Kolom Keterangan
+    { wch: 15 }, 
+    { wch: 55 }, 
+    { wch: 35 }  
   ];
 
-  // Eksekusi Download Berkas Langsung di Browser
   const namaFile = `Log_Gudang_${new Date().toISOString().slice(0,10)}.xlsx`;
   XLSX.writeFile(bukuKerja, namaFile);
 });
