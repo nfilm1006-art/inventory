@@ -12,7 +12,6 @@ function aturVisibilitasHalaman() {
     if (loginScreen) loginScreen.classList.add("hidden");
     if (mainScreen) mainScreen.classList.remove("hidden");
     
-    // Memberikan jeda aman agar DOM HTML siap sepenuhnya sebelum merender data
     setTimeout(() => {
       renderAplikasi();
     }, 50); 
@@ -54,18 +53,16 @@ document.getElementById("btnLogout").addEventListener("click", () => {
 const placeholderImg = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><rect width='18' height='18' x='3' y='3' rx='2' ry='2'/><circle cx='9' cy='9' r='2'/><path d='m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21'/></svg>";
 
 const initialInventory = [
-  { id: '1', nama: 'Kabel Belden Cat5', stok: 220, minimalStok: 10, rak: 'RAK A-1 Depo', foto: placeholderImg },
-  { id: '2', nama: 'Mur 14', stok: 4, minimalStok: 12, rak: 'Rak B-2 501', foto: placeholderImg },
-  { id: '3', nama: 'Cat semprot putih', stok: 30, minimalStok: 5, rak: 'Rak C-1 501', foto: placeholderImg },
+  { id: '1', nama: 'Kabel Belden Cat5', stok: 220, minimalStok: 10, rak: 'RAK A-1 Depo', foto: placeholderImg, aktifKartu: "", aktifKuota: "" },
+  { id: '2', nama: 'Perdana Internet 15GB - 1', stok: 1, minimalStok: 0, rak: 'Rak B-2 501', foto: placeholderImg, aktifKartu: "2026-12-31", aktifKuota: "2026-07-15" },
+  { id: '3', nama: 'Cat semprot putih', stok: 30, minimalStok: 5, rak: 'Rak C-1 501', foto: placeholderImg, aktifKartu: "", aktifKuota: "" },
 ];
 
-// Daftar lokasi rak bawaan (default) jika local storage kosong
 const initialRacks = ['RAK A-1 Depo', 'Rak B-2 501', 'Rak C-1 501', 'Gudang Utama', 'Lainnya'];
 
 let products = JSON.parse(localStorage.getItem('gudang_data_foto')) || initialInventory;
 let listRak = JSON.parse(localStorage.getItem('gudang_list_rak')) || initialRacks;
 
-// Log inisialisasi default awal dengan menyertakan format tanggal utuh
 let logs = JSON.parse(localStorage.getItem('gudang_logs')) || [
   { teks: "Sistem diinisialisasi berhasil.", waktu: `${new Date().toLocaleDateString('id-ID')} ${new Date().toLocaleTimeString('id-ID')}` }
 ];
@@ -85,7 +82,6 @@ function mainkanSuaraAlarm() {
   oscillator.stop(audioCtx.currentTime + 0.15);
 }
 
-// Mencatat aktivitas sistem dengan struktur Tanggal + Waktu lengkap
 function catatAktivitas(teks) {
   const tgl = new Date().toLocaleDateString('id-ID');
   const jam = new Date().toLocaleTimeString('id-ID');
@@ -94,18 +90,15 @@ function catatAktivitas(teks) {
   if (logs.length > 30) logs.pop(); 
 }
 
-// Sinkronisasi opsi isian pada menu dropdown input barang dan filter rak
 function renderDropdownRak() {
   const inputRakSelect = document.getElementById('inputRak');
   const filterRakSelect = document.getElementById('filterRak');
   
-  // Guard Pembatas: Jika elemen HTML belum siap/tampil, hentikan fungsi agar tidak crash
   if (!inputRakSelect || !filterRakSelect) return;
 
   const selectedInputVal = inputRakSelect.value;
   const selectedFilterVal = filterRakSelect.value || 'SEMUA';
 
-  // Gambar opsi di Form Tambah Barang
   inputRakSelect.innerHTML = '';
   listRak.forEach(rak => {
     const opt = document.createElement('option');
@@ -115,7 +108,6 @@ function renderDropdownRak() {
   });
   if (listRak.includes(selectedInputVal)) inputRakSelect.value = selectedInputVal;
 
-  // Gambar opsi di Menu Filter Monitoring
   filterRakSelect.innerHTML = '<option value="SEMUA">✨ Tampilkan Semua Lokasi</option>';
   listRak.forEach(rak => {
     const opt = document.createElement('option');
@@ -124,6 +116,37 @@ function renderDropdownRak() {
     filterRakSelect.appendChild(opt);
   });
   filterRakSelect.value = selectedFilterVal;
+}
+
+function dapatkanBadgeCountdown(tanggalTarget) {
+  if (!tanggalTarget) return `<span class="text-slate-500 italic text-xs">-</span>`;
+  
+  const targetTime = new Date(tanggalTarget + "T23:59:59").getTime();
+  const sekarang = new Date().getTime();
+  const selisih = targetTime - sekarang;
+
+  if (selisih <= 0) {
+    return `<span class="bg-red-500/20 text-red-400 border border-red-500/30 px-2 py-1 rounded font-bold text-[11px] block text-center animate-pulse">❌ KADALUARSA</span>`;
+  }
+
+  const hari = Math.floor(selisih / (1000 * 60 * 60 * 24));
+  const jam = Math.floor((selisih % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+
+  let warnaKelas = "bg-slate-900 border-slate-700 text-emerald-400";
+  if (hari <= 3) {
+    warnaKelas = "bg-red-950/40 border-red-500/40 text-red-400";
+  } else if (hari <= 7) {
+    warnaKelas = "bg-amber-950/40 border-amber-500/40 text-amber-400";
+  }
+
+  return `
+    <div class="text-center">
+      <span class="font-mono ${warnaKelas} border px-2 py-0.5 rounded text-[11px] font-bold block shadow-sm">
+        ${hari}h ${jam}j Sisa
+      </span>
+      <span class="text-[10px] text-slate-500 block mt-0.5 font-mono">${tanggalTarget}</span>
+    </div>
+  `;
 }
 
 function renderAplikasi() {
@@ -137,7 +160,6 @@ function renderAplikasi() {
   
   if (!tabelBodi) return; 
   
-  // Sinkronisasikan isi dropdown terlebih dahulu
   renderDropdownRak();
   
   tabelBodi.innerHTML = '';
@@ -145,61 +167,88 @@ function renderAplikasi() {
   if (kontainerLog) kontainerLog.innerHTML = '';
   let jumlahAlert = 0;
 
-  // Mendapatkan filter lokasi yang saat ini sedang aktif dipilih admin
   const lokasiDipilih = filterRak ? filterRak.value : 'SEMUA';
   
   products.forEach(item => {
-    // Logika pemfilteran lokasi rak secara real-time
     if (lokasiDipilih !== 'SEMUA' && item.rak !== lokasiDipilih) {
-      return; // Lewati baris data ini jika tidak sesuai filter lokasi
+      return; 
     }
 
     const isKritis = Number(item.stok) <= Number(item.minimalStok);
-    
+    let statusMasaAktifKritis = false;
+    let pesanKritisMasaAktif = "";
+
+    const cekMasaAktif = (tgl, tipe) => {
+      if (!tgl) return;
+      const selisih = new Date(tgl + "T23:59:59").getTime() - new Date().getTime();
+      if (selisih <= 0) {
+        statusMasaAktifKritis = true;
+        pesanKritisMasaAktif += `❌ ${tipe} ${item.nama} Habis! `;
+      } else if (selisih / (1000 * 60 * 60 * 24) <= 7) {
+        statusMasaAktifKritis = true;
+        pesanKritisMasaAktif += `⏳ ${tipe} ${item.nama} sisa < 7 hari. `;
+      }
+    };
+
+    cekMasaAktif(item.aktifKartu, "Masa Kartu");
+    cekMasaAktif(item.aktifKuota, "Masa Kuota");
+
     const tr = document.createElement('tr');
     tr.className = 'hover:bg-slate-750 transition-colors border-b border-slate-700/50';
     tr.innerHTML = `
       <td class="px-4 py-3 text-left whitespace-nowrap">
-        <img src="${item.foto || placeholderImg}" alt="${item.nama}" class="w-10 h-10 md:w-12 md:h-12 object-cover rounded-lg bg-slate-900 border border-slate-700 shadow-inner" />
+        <img src="${item.foto || placeholderImg}" alt="${item.nama}" class="w-10 h-10 object-cover rounded-lg bg-slate-900 border border-slate-700 shadow-inner" />
       </td>
       <td class="px-4 py-3 font-medium text-white text-left break-words">
         ${item.nama}
       </td>
       <td class="px-4 py-3 text-center whitespace-nowrap">
-        <span class="font-mono bg-slate-900 px-2.5 py-1 rounded text-slate-400 text-[11px] md:text-xs border border-slate-700/50">
+        <span class="font-mono bg-slate-900 px-2 py-0.5 rounded text-slate-400 text-[11px] border border-slate-700/50">
           ${item.rak}
         </span>
       </td>
       <td class="px-4 py-3 text-center whitespace-nowrap">
-        <span class="px-3 py-1 rounded-full font-bold text-[11px] md:text-xs inline-block ${isKritis ? 'bg-red-500/20 text-red-400 border border-red-500/30' : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'}">
+        <span class="px-2.5 py-0.5 rounded-full font-bold text-[11px] inline-block ${isKritis ? 'bg-red-500/20 text-red-400 border border-red-500/30' : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'}">
           ${item.stok} Pcs
         </span>
       </td>
-      <td class="px-4 py-3 text-center text-slate-400 font-medium whitespace-nowrap">
+      <td class="px-4 py-3 text-center text-slate-400 font-medium whitespace-nowrap text-xs">
         ${item.minimalStok} Pcs
       </td>
+      
       <td class="px-4 py-3 text-center whitespace-nowrap">
-        <div class="flex justify-center gap-1.5">
-          <button data-id="${item.id}" data-aksi="kurang" class="bg-slate-700 hover:bg-slate-600 active:scale-95 text-white text-xs px-2.5 py-1 rounded transition font-bold select-none">-1</button>
-          <button data-id="${item.id}" data-aksi="tambah" class="bg-slate-700 hover:bg-slate-600 active:scale-95 text-white text-xs px-2.5 py-1 rounded transition font-bold select-none">+1</button>
+        ${dapatkanBadgeCountdown(item.aktifKartu)}
+      </td>
+      <td class="px-4 py-3 text-center whitespace-nowrap">
+        ${dapatkanBadgeCountdown(item.aktifKuota)}
+      </td>
+
+      <td class="px-4 py-3 text-center whitespace-nowrap">
+        <div class="flex justify-center gap-1">
+          <button data-id="${item.id}" data-aksi="kurang" class="bg-slate-700 hover:bg-slate-600 active:scale-95 text-white text-[11px] px-2 py-0.5 rounded transition font-bold select-none">-1</button>
+          <button data-id="${item.id}" data-aksi="tambah" class="bg-slate-700 hover:bg-slate-600 active:scale-95 text-white text-[11px] px-2 py-0.5 rounded transition font-bold select-none">+1</button>
         </div>
       </td>
       <td class="px-4 py-3 text-center whitespace-nowrap">
-        <button data-id="${item.id}" data-aksi="hapus" class="bg-red-600/20 hover:bg-red-600 text-red-400 hover:text-white text-xs px-2.5 py-1.5 rounded transition border border-red-500/20 flex items-center justify-center mx-auto select-none">
+        <button data-id="${item.id}" data-aksi="hapus" class="bg-red-600/20 hover:bg-red-600 text-red-400 hover:text-white text-xs px-2 py-1 rounded transition border border-red-500/20 flex items-center justify-center mx-auto select-none">
           🗑️
         </button>
       </td>
     `;
     tabelBodi.appendChild(tr);
 
-    if (isKritis) {
+    if (isKritis || statusMasaAktifKritis) {
       jumlahAlert++;
+      let templatePesan = "";
+      if (isKritis) templatePesan += `⚠️ Stok ${item.nama} kritis! Sisa ${item.stok} Pcs. `;
+      if (statusMasaAktifKritis) templatePesan += pesanKritisMasaAktif;
+
       const alertDiv = document.createElement('div');
       alertDiv.className = 'bg-red-950/40 border-l-4 border-red-500 p-3 rounded-r-lg shadow-md border border-y-slate-700 border-r-slate-700 flex gap-3 items-center';
       alertDiv.innerHTML = `
         <img src="${item.foto || placeholderImg}" class="w-10 h-10 object-cover rounded bg-slate-900 border border-red-500/20" />
-        <div>
-          <p class="text-xs text-red-200 font-medium">⚠️ Stok ${item.nama} kritis! Sisa ${item.stok} Pcs</p>
+        <div class="flex-1 min-w-0">
+          <p class="text-xs text-red-200 font-medium break-words">${templatePesan}</p>
           <span class="text-[9px] text-red-400 block mt-0.5 font-mono">LIVE MONITORING</span>
         </div>
       `;
@@ -209,7 +258,7 @@ function renderAplikasi() {
 
   if (badgeAlert) badgeAlert.innerText = `${jumlahAlert} Terdeteksi`;
   if (jumlahAlert === 0 && kontainerNotifikasi) {
-    kontainerNotifikasi.innerHTML = `<div class="text-center text-slate-500 pt-10 text-sm"><p>✅ Stok aman terkendali.</p></div>`;
+    kontainerNotifikasi.innerHTML = `<div class="text-center text-slate-500 pt-10 text-sm"><p>✅ Semua aman terkendali.</p></div>`;
   }
 
   logs.forEach(log => {
@@ -238,12 +287,10 @@ channel.onmessage = (event) => {
   renderAplikasi();
 };
 
-// Pasang Event Listener perubahan dropdown filter jika elemennya eksis
 if (document.getElementById('filterRak')) {
   document.getElementById('filterRak').addEventListener('change', renderAplikasi);
 }
 
-// Mengelola daftar isi menu dropdown rak (Tambah / Hapus Kustom)
 if (document.getElementById('btnKelolaRak')) {
   document.getElementById('btnKelolaRak').addEventListener('click', () => {
     const menuOpsi = prompt(
@@ -285,34 +332,82 @@ if (document.getElementById('btnKelolaRak')) {
   });
 }
 
-// Submit Form Pemasukan Data Barang Baru
+// LOGIKA BARU: Tampilkan/Sembunyikan Input Sesuai Mode Massal yang Dipilih
+document.getElementById('checkInputMassal').addEventListener('change', (e) => {
+  const wrapperBiasa = document.getElementById('wrapperStokBiasa');
+  const wrapperMassal = document.getElementById('wrapperJumlahMassal');
+  
+  if (e.target.checked) {
+    wrapperBiasa.classList.add('hidden');
+    wrapperMassal.classList.remove('hidden');
+  } else {
+    wrapperBiasa.classList.remove('hidden');
+    wrapperMassal.classList.add('hidden');
+  }
+});
+
+// Submit Form Pemasukan Data Barang Baru + Menyimpan Masa Aktif (Mendukung Satuan & Massal)
 document.getElementById('formBarang').addEventListener('submit', (e) => {
   e.preventDefault();
   const nama = document.getElementById('inputNama').value;
   const rak = document.getElementById('inputRak').value;
-  const stok = Number(document.getElementById('inputStok').value);
-  const minimalStok = Number(document.getElementById('inputMin').value);
   const fileFoto = document.getElementById('inputFoto').files[0];
+  const aktifKartu = document.getElementById('inputAktifKartu').value;
+  const aktifKuota = document.getElementById('inputAktifKuota').value;
+  
+  const isMassal = document.getElementById('checkInputMassal').checked;
 
-  const buatBarangBaru = (fotoUrl) => {
-    const barangBaru = { id: Date.now().toString(), nama, rak, stok, minimalStok, foto: fotoUrl };
-    products.push(barangBaru);
-    catatAktivitas(`Menambahkan item baru "${nama}" di [${rak}] (Stok: ${stok})`);
-    if (stok <= minimalStok) mainkanSuaraAlarm();
+  const eksekusiSimpan = (fotoUrl) => {
+    if (isMassal) {
+      // Jika mode massal aktif, lakukan perulangan
+      const jumlahKartu = Number(document.getElementById('inputJumlahMassal').value) || 1;
+      
+      for (let i = 1; i <= jumlahKartu; i++) {
+        const barangBaru = { 
+          id: (Date.now() + i).toString(), // Pastikan ID tetap unik di setiap perulangan
+          nama: `${nama} - ${i}`, // Penomoran otomatis di belakang nama kartu
+          rak, 
+          stok: 1, // Untuk monitoring satuan, stok massal dimulai dari 1 pcs per kartu
+          minimalStok: 0, 
+          foto: fotoUrl,
+          aktifKartu, 
+          aktifKuota 
+        };
+        products.push(barangBaru);
+      }
+      catatAktivitas(`Massal: Menambahkan sebanyak ${jumlahKartu} kartu baru "${nama}" di [${rak}]`);
+    } else {
+      // Input Normal Satuan/Biasa
+      const stok = Number(document.getElementById('inputStok').value);
+      const minimalStok = Number(document.getElementById('inputMin').value);
+      
+      const barangBaru = { 
+        id: Date.now().toString(), 
+        nama, rak, stok, minimalStok, foto: fotoUrl,
+        aktifKartu, aktifKuota 
+      };
+      products.push(barangBaru);
+      catatAktivitas(`Menambahkan item baru "${nama}" di [${rak}] (Stok: ${stok})`);
+      if (stok <= minimalStok) mainkanSuaraAlarm();
+    }
+
     simpanDanSiarkan();
     e.target.reset();
+    
+    // Kembalikan ke tampilan input biasa setelah form direset
+    document.getElementById('wrapperStokBiasa').classList.remove('hidden');
+    document.getElementById('wrapperJumlahMassal').classList.add('hidden');
   };
 
   if (fileFoto) {
     const reader = new FileReader();
-    reader.onload = function(event) { buatBarangBaru(event.target.result); };
+    reader.onload = function(event) { eksekusiSimpan(event.target.result); };
     reader.readAsDataURL(fileFoto);
   } else {
-    buatBarangBaru(placeholderImg);
+    eksekusiSimpan(placeholderImg);
   }
 });
 
-// Event Delegation Click Handler untuk Aksi Tombol-Tombol di Tabel (+1, -1, Hapus)
 document.getElementById('tabelBodi').addEventListener('click', (e) => {
   const tombol = e.target.closest('button');
   if (!tombol) return;
@@ -391,8 +486,6 @@ document.getElementById('btnBersihkanLog').addEventListener('click', () => {
   }
 });
 
-
-// ==================== SEKTOR 3: EKSPOR EXCEL GENERATOR SYSTEM ====================
 document.getElementById('btnDownloadExcel').addEventListener('click', () => {
   if (logs.length === 0) {
     alert("⚠️ Tidak ada data aktivitas untuk diunduh!");
@@ -423,7 +516,7 @@ document.getElementById('btnDownloadExcel').addEventListener('click', () => {
   XLSX.utils.book_append_sheet(bukuKerja, lembarKerja, "Log Aktivitas");
 
   lembarKerja["!cols"] = [
-    { wch: 22 }, // Ditingkatkan lebarnya agar muat teks Tanggal + Jam
+    { wch: 22 }, 
     { wch: 55 }, 
     { wch: 35 }  
   ];
@@ -432,5 +525,10 @@ document.getElementById('btnDownloadExcel').addEventListener('click', () => {
   XLSX.writeFile(bukuKerja, namaFile);
 });
 
-// Jalankan pengaturan awal saat file pertama dimuat
+setInterval(() => {
+  if (isLoggedIn) {
+    renderAplikasi();
+  }
+}, 1000);
+
 aturVisibilitasHalaman();
