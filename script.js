@@ -54,7 +54,7 @@ const placeholderImg = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/20
 
 const initialInventory = [
   { id: '1', nama: 'Kabel Belden Cat5', stok: 220, minimalStok: 10, rak: 'RAK A-1 Depo', foto: placeholderImg, aktifKartu: "", aktifKuota: "" },
-  { id: '2', nama: 'Perdana Internet 15GB - 1', stok: 1, minimalStok: 0, rak: 'Rak B-2 501', foto: placeholderImg, aktifKartu: "2026-12-31", aktifKuota: "2026-07-15" },
+  { id: '2', nama: 'Perdana Internet 15GB - 1', stok: 1, minimalStok: 0, rak: 'Rak B-2 501', foto: placeholderImg, aktifKartu: "2026-12-31", aktifKuota: "2026-06-15" },
   { id: '3', nama: 'Cat semprot putih', stok: 30, minimalStok: 5, rak: 'Rak C-1 501', foto: placeholderImg, aktifKartu: "", aktifKuota: "" },
 ];
 
@@ -133,9 +133,11 @@ function dapatkanBadgeCountdown(tanggalTarget) {
   const jam = Math.floor((selisih % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
 
   let warnaKelas = "bg-slate-900 border-slate-700 text-emerald-400";
-  if (hari <= 3) {
+  
+  // WARNA WARING: Berubah jadi oranye/merah jika sisa masa aktif di bawah 30 hari (1 bulan)
+  if (hari <= 7) {
     warnaKelas = "bg-red-950/40 border-red-500/40 text-red-400";
-  } else if (hari <= 7) {
+  } else if (hari <= 30) {
     warnaKelas = "bg-amber-950/40 border-amber-500/40 text-amber-400";
   }
 
@@ -181,12 +183,14 @@ function renderAplikasi() {
     const cekMasaAktif = (tgl, tipe) => {
       if (!tgl) return;
       const selisih = new Date(tgl + "T23:59:59").getTime() - new Date().getTime();
+      const sisaHari = selisih / (1000 * 60 * 60 * 24);
+
       if (selisih <= 0) {
         statusMasaAktifKritis = true;
         pesanKritisMasaAktif += `❌ ${tipe} ${item.nama} Habis! `;
-      } else if (selisih / (1000 * 60 * 60 * 24) <= 7) {
+      } else if (sisaHari <= 30) { // LOGIKAL PERUBAHAN: Masuk kondisi jika kurang dari 30 hari (1 bulan)
         statusMasaAktifKritis = true;
-        pesanKritisMasaAktif += `⏳ ${tipe} ${item.nama} sisa < 7 hari. `;
+        pesanKritisMasaAktif += `⏳ ${tipe} ${item.nama} < 1 Bulan (${Math.ceil(sisaHari)} hari lagi). `;
       }
     };
 
@@ -237,6 +241,7 @@ function renderAplikasi() {
     `;
     tabelBodi.appendChild(tr);
 
+    // Menarik data masuk ke kotak Peringatan Gudang jika stok menipis ATAU masa aktif kurang dari 1 bulan
     if (isKritis || statusMasaAktifKritis) {
       jumlahAlert++;
       let templatePesan = "";
@@ -332,7 +337,6 @@ if (document.getElementById('btnKelolaRak')) {
   });
 }
 
-// LOGIKA BARU: Tampilkan/Sembunyikan Input Sesuai Mode Massal yang Dipilih
 document.getElementById('checkInputMassal').addEventListener('change', (e) => {
   const wrapperBiasa = document.getElementById('wrapperStokBiasa');
   const wrapperMassal = document.getElementById('wrapperJumlahMassal');
@@ -346,7 +350,6 @@ document.getElementById('checkInputMassal').addEventListener('change', (e) => {
   }
 });
 
-// Submit Form Pemasukan Data Barang Baru + Menyimpan Masa Aktif (Mendukung Satuan & Massal)
 document.getElementById('formBarang').addEventListener('submit', (e) => {
   e.preventDefault();
   const nama = document.getElementById('inputNama').value;
@@ -358,16 +361,28 @@ document.getElementById('formBarang').addEventListener('submit', (e) => {
   const isMassal = document.getElementById('checkInputMassal').checked;
 
   const eksekusiSimpan = (fotoUrl) => {
+    let memicuAlarmMasaAktif = false;
+
+    // Fungsi pembantu mengecek sisa hari untuk menyalakan audio buzzer pas submit
+    const cekKritisForm = (tgl) => {
+      if (!tgl) return false;
+      const sisa = (new Date(tgl + "T23:59:59").getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24);
+      return sisa <= 30; // true jika di bawah 1 bulan
+    };
+
+    if (cekKritisForm(aktifKartu) || cekKritisForm(aktifKuota)) {
+      memicuAlarmMasaAktif = true;
+    }
+
     if (isMassal) {
-      // Jika mode massal aktif, lakukan perulangan
       const jumlahKartu = Number(document.getElementById('inputJumlahMassal').value) || 1;
       
       for (let i = 1; i <= jumlahKartu; i++) {
         const barangBaru = { 
-          id: (Date.now() + i).toString(), // Pastikan ID tetap unik di setiap perulangan
-          nama: `${nama} - ${i}`, // Penomoran otomatis di belakang nama kartu
+          id: (Date.now() + i).toString(), 
+          nama: `${nama} - ${i}`, 
           rak, 
-          stok: 1, // Untuk monitoring satuan, stok massal dimulai dari 1 pcs per kartu
+          stok: 1, 
           minimalStok: 0, 
           foto: fotoUrl,
           aktifKartu, 
@@ -377,7 +392,6 @@ document.getElementById('formBarang').addEventListener('submit', (e) => {
       }
       catatAktivitas(`Massal: Menambahkan sebanyak ${jumlahKartu} kartu baru "${nama}" di [${rak}]`);
     } else {
-      // Input Normal Satuan/Biasa
       const stok = Number(document.getElementById('inputStok').value);
       const minimalStok = Number(document.getElementById('inputMin').value);
       
@@ -388,13 +402,15 @@ document.getElementById('formBarang').addEventListener('submit', (e) => {
       };
       products.push(barangBaru);
       catatAktivitas(`Menambahkan item baru "${nama}" di [${rak}] (Stok: ${stok})`);
-      if (stok <= minimalStok) mainkanSuaraAlarm();
+      if (stok <= minimalStok) memicuAlarmMasaAktif = true;
     }
+
+    // Jika ada yang kritis, bunyikan alarm
+    if (memicuAlarmMasaAktif) mainkanSuaraAlarm();
 
     simpanDanSiarkan();
     e.target.reset();
     
-    // Kembalikan ke tampilan input biasa setelah form direset
     document.getElementById('wrapperStokBiasa').classList.remove('hidden');
     document.getElementById('wrapperJumlahMassal').classList.add('hidden');
   };
