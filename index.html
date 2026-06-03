@@ -3,12 +3,13 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>INVENTORY</title>
+  <title>INVENTORY SYSTEM</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 </head>
 <body class="bg-slate-900 text-slate-100 font-sans min-h-screen flex flex-col">
 
+  <!-- ==================== HALAMAN LOGIN ==================== -->
   <div id="halamanLogin" class="flex-1 flex items-center justify-center p-6">
     <div class="bg-slate-800 p-8 rounded-2xl border border-slate-700 shadow-2xl w-full max-w-md space-y-6">
       <div class="text-center space-y-2">
@@ -36,7 +37,9 @@
     </div>
   </div>
 
+  <!-- ==================== APLIKASI UTAMA ==================== -->
   <div id="aplikasiUtama" class="hidden flex-1 flex flex-col">
+    <!-- Navbar -->
     <nav class="bg-slate-800 border-b border-slate-700 p-4 shadow-xl flex justify-between items-center">
       <div class="flex items-center gap-3">
         <span class="text-2xl">📦</span>
@@ -53,130 +56,236 @@
       </div>
     </nav>
 
-    <div class="p-6 max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-6 w-full">
+    <!-- MENU NAVIGASI HALAMAN (TABBING) -->
+    <div class="bg-slate-850 border-b border-slate-800 px-6 py-2 flex gap-2">
+      <button id="tabLogistik" class="px-4 py-2 text-sm font-semibold rounded-lg bg-emerald-600 text-white shadow transition-all">
+        📱 Data Kartu & Logistik
+      </button>
+      <button id="tabPeralatan" class="px-4 py-2 text-sm font-semibold rounded-lg bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-white transition-all">
+        🛠️ Data Peralatan Kerja
+      </button>
+    </div>
+
+    <!-- Konten Grid Utama -->
+    <div class="p-6 max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-6 w-full flex-1">
       
+      <!-- SISI KIRI: PANEL DATA DINAMIS -->
       <div class="lg:col-span-2 space-y-6">
         
-        <div class="bg-slate-800 p-5 rounded-xl border border-slate-700 shadow-md">
-          <h3 class="text-sm font-semibold text-slate-400 mb-4 uppercase tracking-wider">Tambah Item Ke List</h3>
-          <form id="formBarang" class="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
-            <div class="space-y-2">
+        <!-- ==================== TAB 1: HALAMAN LOGISTIK & KARTU ==================== -->
+        <div id="halamanLogistik" class="space-y-6">
+          <!-- Form Input Barang -->
+          <div class="bg-slate-800 p-5 rounded-xl border border-slate-700 shadow-md">
+            <h3 class="text-sm font-semibold text-slate-400 mb-4 uppercase tracking-wider">Tambah Item Logistik / Kartu</h3>
+            <form id="formBarang" class="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
+              <div class="space-y-2">
+                <div>
+                  <label class="block text-xs text-slate-400 mb-1">Nama Barang / Kartu</label>
+                  <input id="inputNama" type="text" class="w-full bg-slate-900 border border-slate-600 rounded p-2 text-sm text-white focus:outline-none focus:border-emerald-500" placeholder="Contoh: Perdana Telkomsel 10GB" />
+                </div>
+                <div class="flex items-center gap-2 pt-1">
+                  <input id="checkInputMassal" type="checkbox" class="w-4 h-4 text-emerald-600 bg-slate-900 border-slate-600 rounded focus:ring-emerald-500 cursor-pointer" />
+                  <label for="checkInputMassal" class="text-xs text-slate-300 font-medium cursor-pointer select-none">💡 Aktifkan Mode Input Beberapa Kartu</label>
+                </div>
+              </div>
               <div>
-                <label class="block text-xs text-slate-400 mb-1">Nama Barang / Kartu</label>
-                <input id="inputNama" type="text" class="w-full bg-slate-900 border border-slate-600 rounded p-2 text-sm text-white focus:outline-none focus:border-emerald-500" placeholder="Contoh: Perdana Telkomsel 10GB" required />
+                <label class="block text-xs text-slate-400 mb-1">Lokasi Rak</label>
+                <div class="flex gap-2">
+                  <select id="inputRak" class="flex-1 bg-slate-900 border border-slate-600 rounded p-2 text-sm text-white focus:outline-none focus:border-emerald-500 transition-colors cursor-pointer"></select>
+                  <button type="button" id="btnKelolaRak" class="bg-slate-700 hover:bg-slate-600 text-white px-2.5 py-2 rounded text-xs font-bold transition flex items-center justify-center border border-slate-600 shadow shrink-0">⚙️ Kelola</button>
+                </div>
               </div>
-              <div class="flex items-center gap-2 pt-1">
-                <input id="checkInputMassal" type="checkbox" class="w-4 h-4 text-emerald-600 bg-slate-900 border-slate-600 rounded focus:ring-emerald-500 cursor-pointer" />
-                <label for="checkInputMassal" class="text-xs text-slate-300 font-medium cursor-pointer select-none">💡 Aktifkan Mode Input Beberapa Kartu</label>
+              
+              <div id="wrapperStokBiasa">
+                <label class="block text-xs text-slate-400 mb-1">Stok / Batas Min</label>
+                <div class="flex gap-1">
+                  <input id="inputStok" type="number" class="w-1/2 bg-slate-900 border border-slate-600 rounded p-2 text-sm text-white focus:outline-none focus:border-emerald-500" placeholder="Stok" min="0" value="1" />
+                  <input id="inputMin" type="number" class="w-1/2 bg-slate-900 border border-slate-600 rounded p-2 text-sm text-white focus:outline-none focus:border-emerald-500" placeholder="Min" min="0" value="0" />
+                </div>
               </div>
-            </div>
-            <div>
-              <label class="block text-xs text-slate-400 mb-1">Lokasi Rak</label>
-              <div class="flex gap-2">
-                <select id="inputRak" class="flex-1 bg-slate-900 border border-slate-600 rounded p-2 text-sm text-white focus:outline-none focus:border-emerald-500 transition-colors cursor-pointer">
-                  </select>
-                <button type="button" id="btnKelolaRak" class="bg-slate-700 hover:bg-slate-600 text-white px-2.5 py-2 rounded text-xs font-bold transition flex items-center justify-center border border-slate-600 shadow shrink-0" title="Kelola List Dropdown Rak">
-                  ⚙️ Kelola
-                </button>
+              <div id="wrapperJumlahMassal" class="hidden">
+                <label class="block text-xs text-amber-400 mb-1 font-semibold">Jumlah Kartu yang Mau Ditambah</label>
+                <input id="inputJumlahMassal" type="number" class="w-full bg-slate-900 border border-amber-500/50 rounded p-2 text-sm text-white focus:outline-none focus:border-amber-500" placeholder="Contoh: 10" min="1" value="1" />
+              </div>
+
+              <div>
+                <label class="block text-xs text-slate-400 mb-1">Upload Foto Produk</label>
+                <input id="inputFoto" type="file" accept="image/*" class="w-full bg-slate-900 border border-slate-600 rounded p-1.5 text-xs text-slate-400 file:bg-slate-700 file:text-slate-200 cursor-pointer" />
+              </div>
+              <div>
+                <label class="block text-xs text-slate-400 mb-1">Masa Aktif Kartu (Opsional)</label>
+                <input id="inputAktifKartu" type="date" class="w-full bg-slate-900 border border-slate-600 rounded p-2 text-sm text-white focus:outline-none focus:border-emerald-500" />
+              </div>
+              <div>
+                <label class="block text-xs text-slate-400 mb-1">Masa Aktif Kuota (Opsional)</label>
+                <input id="inputAktifKuota" type="date" class="w-full bg-slate-900 border border-slate-600 rounded p-2 text-sm text-white focus:outline-none focus:border-emerald-500" />
+              </div>
+
+              <div class="md:col-span-2 mt-2">
+                <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-sm p-2.5 rounded transition shadow-lg font-semibold tracking-wide">+ Input Barang</button>
+              </div>
+            </form>
+          </div>
+
+          <!-- Tabel Monitoring Stok Fisik -->
+          <div class="space-y-4">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-850 p-1.5 rounded-lg border border-slate-800">
+              <h2 class="text-base md:text-lg font-semibold text-slate-400 px-2">Monitoring Stok Fisik</h2>
+              <div class="flex items-center gap-2 px-2">
+                <label for="filterRak" class="text-xs text-slate-400 font-medium whitespace-nowrap">Filter Lokasi:</label>
+                <select id="filterRak" class="bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white cursor-pointer min-w-[150px]"></select>
               </div>
             </div>
             
-            <div id="wrapperStokBiasa">
-              <label class="block text-xs text-slate-400 mb-1">Stok / Batas Min</label>
-              <div class="flex gap-1">
-                <input id="inputStok" type="number" class="w-1/2 bg-slate-900 border border-slate-600 rounded p-2 text-sm text-white focus:outline-none focus:border-emerald-500" placeholder="Stok" min="0" value="1" />
-                <input id="inputMin" type="number" class="w-1/2 bg-slate-900 border border-slate-600 rounded p-2 text-sm text-white focus:outline-none focus:border-emerald-500" placeholder="Min" min="0" value="0" />
+            <div class="bg-slate-800 rounded-xl border border-slate-700 shadow-2xl overflow-hidden w-full">
+              <div class="overflow-x-auto block w-full scrollbar-thin">
+                <table class="w-full min-w-[950px] divide-y divide-slate-700 text-left table-fixed">
+                  <thead class="bg-slate-850 text-slate-400 text-[11px] md:text-xs uppercase font-semibold">
+                    <tr>
+                      <th class="px-4 py-3.5 w-[70px]">Foto</th>
+                      <th class="px-4 py-3.5 w-[160px]">Nama Barang</th>
+                      <th class="px-4 py-3.5 text-center w-[110px]">Rak</th>
+                      <th class="px-4 py-3.5 text-center w-[90px]">Stok</th>
+                      <th class="px-4 py-3.5 text-center w-[85px]">Min</th>
+                      <th class="px-4 py-3.5 text-center w-[160px]">⏳ Sisa Masa Kartu</th>
+                      <th class="px-4 py-3.5 text-center w-[160px]">⚡ Sisa Masa Kuota</th>
+                      <th class="px-4 py-3.5 text-center w-[110px]">Ubah Stok</th>
+                      <th class="px-4 py-3.5 text-center w-[65px]">Aksi</th>
+                    </tr>
+                  </thead>
+                  <tbody id="tabelBodi" class="divide-y divide-slate-700 text-xs md:text-sm"></tbody>
+                </table>
               </div>
             </div>
-
-            <div id="wrapperJumlahMassal" class="hidden">
-              <label class="block text-xs text-amber-400 mb-1 font-semibold">Jumlah Kartu yang Mau Ditambah</label>
-              <input id="inputJumlahMassal" type="number" class="w-full bg-slate-900 border border-amber-500/50 rounded p-2 text-sm text-white focus:outline-none focus:border-amber-500" placeholder="Contoh: 10" min="1" value="1" />
-            </div>
-
-            <div>
-              <label class="block text-xs text-slate-400 mb-1">Upload Foto Produk</label>
-              <input id="inputFoto" type="file" accept="image/*" class="w-full bg-slate-900 border border-slate-600 rounded p-1.5 text-xs text-slate-400 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:font-semibold file:bg-slate-700 file:text-slate-200 hover:file:bg-slate-600 cursor-pointer" />
-            </div>
-            
-            <div>
-              <label class="block text-xs text-slate-400 mb-1">Masa Aktif Kartu (Opsional)</label>
-              <input id="inputAktifKartu" type="date" class="w-full bg-slate-900 border border-slate-600 rounded p-2 text-sm text-white focus:outline-none focus:border-emerald-500 cursor-pointer" />
-            </div>
-            <div>
-              <label class="block text-xs text-slate-400 mb-1">Masa Aktif Kuota (Opsional)</label>
-              <input id="inputAktifKuota" type="date" class="w-full bg-slate-900 border border-slate-600 rounded p-2 text-sm text-white focus:outline-none focus:border-emerald-500 cursor-pointer" />
-            </div>
-
-            <div class="md:col-span-2 mt-2">
-              <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-sm p-2.5 rounded transition shadow-lg font-semibold tracking-wide">
-                + Input Barang
-              </button>
-            </div>
-          </form>
+          </div>
         </div>
 
-        <div class="space-y-4">
-          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-850 p-1.5 rounded-lg border border-slate-800">
-            <h2 class="text-base md:text-lg font-semibold text-slate-400 px-2">Monitoring Stok Fisik</h2>
-            
-            <div class="flex items-center gap-2 px-2">
-              <label for="filterRak" class="text-xs text-slate-400 font-medium whitespace-nowrap">Filter Lokasi:</label>
-              <select id="filterRak" class="bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-500 transition-colors cursor-pointer min-w-[150px]">
-              </select>
+        <!-- ==================== TAB 2: HALAMAN PERALATAN ==================== -->
+        <div id="halamanPeralatan" class="space-y-6 hidden">
+          <!-- Form Input Peralatan -->
+          <div class="bg-slate-800 p-5 rounded-xl border border-slate-700 shadow-md">
+            <h3 class="text-sm font-semibold text-cyan-400 mb-4 uppercase tracking-wider">Tambah Peralatan / Alat Kerja Baru</h3>
+            <form id="formPeralatan" class="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
+              <div>
+                <label class="block text-xs text-slate-400 mb-1">Nama Alat / Hardware</label>
+                <input id="inputNamaAlat" type="text" class="w-full bg-slate-900 border border-slate-600 rounded p-2 text-sm text-white focus:outline-none focus:border-cyan-500" placeholder="Contoh: Tang Krimping RJ45" required />
+              </div>
+              <div>
+                <label class="block text-xs text-slate-400 mb-1">Kategori / Jenis Alat</label>
+                <div class="flex gap-2">
+                  <select id="inputKategoriAlat" class="flex-1 bg-slate-900 border border-slate-600 rounded p-2 text-sm text-white focus:outline-none focus:border-cyan-500 cursor-pointer">
+                    <!-- Opsi dinamis via JS -->
+                  </select>
+                  <button type="button" id="btnKelolaKategoriAlat" class="bg-slate-700 hover:bg-slate-600 text-white px-2.5 py-2 rounded text-xs font-bold transition border border-slate-600 shrink-0" title="Kelola Kategori Alat">⚙️</button>
+                </div>
+              </div>
+              <div>
+                <label class="block text-xs text-slate-400 mb-1">Jumlah Unit</label>
+                <input id="inputStokAlat" type="number" class="w-full bg-slate-900 border border-slate-600 rounded p-2 text-sm text-white focus:outline-none focus:border-cyan-500" min="0" value="1" required />
+              </div>
+              <div>
+                <label class="block text-xs text-slate-400 mb-1">Status Kondisi Awal</label>
+                <select id="inputKondisiAlat" class="w-full bg-slate-900 border border-slate-600 rounded p-2 text-sm text-white focus:outline-none focus:border-cyan-500 cursor-pointer">
+                  <option value="BAGUS">✅ Bagus & Layak Pakai</option>
+                  <option value="RUSAK RINGAN">⚠️ Rusak Ringan / Butuh Servis</option>
+                  <option value="RUSAK BERAT">❌ Rusak Berat</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-xs text-slate-400 mb-1">Lokasi Lantai</label>
+                <select id="inputLantaiAlat" class="w-full bg-slate-900 border border-slate-600 rounded p-2 text-sm text-white focus:outline-none focus:border-cyan-500 cursor-pointer">
+                  <option value="Lantai 1">🏢 Lantai 1</option>
+                  <option value="Lantai 2">🏢 Lantai 2</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-xs text-slate-400 mb-1">Detail Posisi Rak / Lemari</label>
+                <select id="inputRakAlat" class="w-full bg-slate-900 border border-slate-600 rounded p-2 text-sm text-white focus:outline-none focus:border-cyan-500 cursor-pointer">
+                  <!-- Menggunakan list dropdown rak yang sama -->
+                </select>
+              </div>
+              <div class="md:col-span-2 mt-2">
+                <button type="submit" class="w-full bg-cyan-600 hover:bg-cyan-500 text-white font-medium text-sm p-2.5 rounded transition shadow-lg font-semibold tracking-wide">+ Simpan Data Alat</button>
+              </div>
+            </form>
+          </div>
+
+          <!-- Tabel Monitoring Peralatan -->
+          <div class="space-y-4">
+            <!-- PANEL FILTER TRIPLE-PARAMETER -->
+            <div class="flex flex-col xl:flex-row items-center justify-between gap-3 bg-slate-850 p-3 rounded-lg border border-slate-800 shadow">
+              <h2 class="text-sm font-bold uppercase tracking-wider text-cyan-400 whitespace-nowrap">Inventaris Peralatan</h2>
+              
+              <div class="flex flex-wrap items-center gap-3 w-full xl:w-auto justify-end">
+                <!-- Filter Kategori -->
+                <div class="flex items-center gap-1.5">
+                  <label for="filterKategoriAlat" class="text-[11px] text-slate-400 font-medium whitespace-nowrap">Kategori:</label>
+                  <select id="filterKategoriAlat" class="bg-slate-800 border border-slate-700 rounded-md px-2.5 py-1.5 text-xs text-white cursor-pointer min-w-[110px]"></select>
+                </div>
+                <!-- Filter Kondisi -->
+                <div class="flex items-center gap-1.5">
+                  <label for="filterKondisiAlat" class="text-[11px] text-slate-400 font-medium whitespace-nowrap">Kondisi:</label>
+                  <select id="filterKondisiAlat" class="bg-slate-800 border border-slate-700 rounded-md px-2.5 py-1.5 text-xs text-white cursor-pointer min-w-[110px]">
+                    <option value="SEMUA">✨ Semua</option>
+                    <option value="BAGUS">✅ Bagus</option>
+                    <option value="RUSAK RINGAN">⚠️ Rsk Ringan</option>
+                    <option value="RUSAK BERAT">❌ Rsk Berat</option>
+                  </select>
+                </div>
+                <!-- Filter Lantai -->
+                <div class="flex items-center gap-1.5">
+                  <label for="filterLantaiAlat" class="text-[11px] text-slate-400 font-medium whitespace-nowrap">Lantai:</label>
+                  <select id="filterLantaiAlat" class="bg-slate-800 border border-slate-700 rounded-md px-2.5 py-1.5 text-xs text-white cursor-pointer min-w-[110px]">
+                    <option value="SEMUA">✨ Semua Lantai</option>
+                    <option value="Lantai 1">🏢 Lantai 1</option>
+                    <option value="Lantai 2">🏢 Lantai 2</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <div class="bg-slate-800 rounded-xl border border-slate-700 shadow-2xl overflow-hidden w-full">
+              <div class="overflow-x-auto block w-full scrollbar-thin">
+                <table class="w-full min-w-[800px] divide-y divide-slate-700 text-left table-fixed">
+                  <thead class="bg-slate-850 text-slate-400 text-[11px] md:text-xs uppercase font-semibold">
+                    <tr>
+                      <th class="px-4 py-3.5 w-[200px]">Nama Alat / Hardware</th>
+                      <th class="px-4 py-3.5 text-center w-[120px]">Kategori</th>
+                      <th class="px-4 py-3.5 text-center w-[80px]">Total</th>
+                      <th class="px-4 py-3.5 text-center w-[130px]">Kondisi</th>
+                      <th class="px-4 py-3.5 text-center w-[110px]">Lokasi</th>
+                      <th class="px-4 py-3.5 text-left w-[130px]">Detail Rak</th>
+                      <th class="px-4 py-3.5 text-center w-[70px]">Aksi</th>
+                    </tr>
+                  </thead>
+                  <tbody id="tabelPeralatanBodi" class="divide-y divide-slate-700 text-xs md:text-sm"></tbody>
+                </table>
+              </div>
             </div>
           </div>
-          
-          <div class="bg-slate-800 rounded-xl border border-slate-700 shadow-2xl overflow-hidden w-full">
-            <div class="overflow-x-auto block w-full scrollbar-thin">
-              <table class="w-full min-w-[950px] divide-y divide-slate-700 text-left table-fixed">
-                <thead class="bg-slate-850 text-slate-400 text-[11px] md:text-xs uppercase font-semibold tracking-wider">
-                  <tr>
-                    <th class="px-4 py-3.5 text-left w-[70px]">Foto</th>
-                    <th class="px-4 py-3.5 text-left w-[160px]">Nama Barang</th>
-                    <th class="px-4 py-3.5 text-center w-[110px]">Rak</th>
-                    <th class="px-4 py-3.5 text-center w-[90px]">Stok</th>
-                    <th class="px-4 py-3.5 text-center w-[85px]">Min</th>
-                    <th class="px-4 py-3.5 text-center w-[160px]">⏳ Sisa Masa Kartu</th>
-                    <th class="px-4 py-3.5 text-center w-[160px]">⚡ Sisa Masa Kuota</th>
-                    <th class="px-4 py-3.5 text-center w-[110px]">Ubah Stok</th>
-                    <th class="px-4 py-3.5 text-center w-[65px]">Aksi</th>
-                  </tr>
-                </thead>
-                <tbody id="tabelBodi" class="divide-y divide-slate-700 text-xs md:text-sm">
-                </tbody>
-              </table>
-            </div>
-          </div>
-          <p class="text-[10px] text-slate-500 block md:hidden text-right italic">↔️ Geser tabel ke kanan/kiri untuk melihat data lengkap</p>
         </div>
 
       </div>
 
+      <!-- SISI KANAN: PANEL PERINGATAN & LOG (STABIL) -->
       <div class="space-y-6">
         <div class="space-y-4">
           <div class="flex justify-between items-center">
             <h2 class="text-lg font-semibold text-slate-400">Peringatan Gudang</h2>
             <span id="badgeAlert" class="bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full animate-pulse">0 Terdeteksi</span>
           </div>
-          <div id="kontainerNotifikasi" class="bg-slate-800 rounded-xl border border-slate-700 p-4 shadow-2xl h-[250px] overflow-y-auto space-y-3">
-          </div>
+          <div id="kontainerNotifikasi" class="bg-slate-800 rounded-xl border border-slate-700 p-4 shadow-2xl h-[250px] overflow-y-auto space-y-3"></div>
         </div>
 
         <div class="space-y-4">
           <div class="flex justify-between items-center">
             <h2 class="text-lg font-semibold text-slate-400">Log Aktivitas Terbaru</h2>
             <div class="flex gap-3">
-              <button id="btnDownloadExcel" class="text-xs text-emerald-400 hover:text-emerald-300 transition flex items-center gap-1 font-medium">
-                📥 Unduh Log (Excel)
-              </button>
-              <button id="btnBersihkanLog" class="text-xs text-slate-500 hover:text-red-400 transition flex items-center gap-1">
-                🔒 Bersihkan Log
-              </button>
+              <button id="btnDownloadExcel" class="text-xs text-emerald-400 hover:text-emerald-300 transition flex items-center gap-1 font-medium">📥 Unduh Log</button>
+              <button id="btnBersihkanLog" class="text-xs text-slate-500 hover:text-red-400 transition flex items-center gap-1">🔒 Bersihkan</button>
             </div>
           </div>
-          <div id="kontainerLog" class="bg-slate-800 rounded-xl border border-slate-700 p-4 shadow-2xl h-[250px] overflow-y-auto space-y-2 font-mono text-xs">
-          </div>
+          <div id="kontainerLog" class="bg-slate-800 rounded-xl border border-slate-700 p-4 shadow-2xl h-[250px] overflow-y-auto space-y-2 font-mono text-xs"></div>
         </div>
       </div>
 
