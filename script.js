@@ -162,7 +162,6 @@ function renderAplikasi() {
   
   if (!tabelBodi) return; 
   
-  renderDropdownRak();
   
   tabelBodi.innerHTML = '';
   if (kontainerNotifikasi) kontainerNotifikasi.innerHTML = '';
