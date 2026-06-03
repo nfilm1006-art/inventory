@@ -413,10 +413,11 @@ if (document.getElementById('btnKelolaRak')) {
   });
 }
 
-// KELOLA PILIHAN KATEGORI ALAT
+// KELOLA PILIHAN KATEGORI ALAT (SUDAH DIPERBAIKI)
 if (document.getElementById('btnKelolaKategoriAlat')) {
   document.getElementById('btnKelolaKategoriAlat').addEventListener('click', () => {
     const menuOpsi = prompt("⚙️ KELOLA PILIHAN KATEGORI PERALATAN\n\nKetik '1' : TAMBAH Kategori Baru\nKetik '2' : HAPUS Kategori");
+    
     if (menuOpsi === '1') {
       const namaKatBaru = prompt("Masukkan nama jenis kategori baru:");
       if (namaKatBaru && namaKatBaru.trim() !== "") {
@@ -429,14 +430,31 @@ if (document.getElementById('btnKelolaKategoriAlat')) {
         }
       }
     } else if (menuOpsi === '2') {
-      let daftarTeks = "Ketik nama kategori yang ingin dihapus:\n\n";
+      let daftarTeks = "Ketik NAMA KATEGORI persis seperti di bawah untuk menghapus:\n\n";
       listKategoriAlat.forEach((k, idx) => { daftarTeks += `${idx + 1}. ${k}\n`; });
+      
       const targetHapus = prompt(daftarTeks);
       if (targetHapus && listKategoriAlat.includes(targetHapus.trim())) {
-        listKategoriAlat = listKategoriAlat.filter(k => k !== targetHapus.trim());
-        catatAktivitas(`Menghapus kategori alat: "${targetHapus.trim()}"`);
+        const kategoriBersih = targetHapus.trim();
+        
+        // 1. Hapus dari array list kategori
+        listKategoriAlat = listKategoriAlat.filter(k => k !== kategoriBersih);
+        
+        // 2. Alihkan peralatan yang kategorinya dihapus ke 'Lainnya' agar tidak error
+        tools = tools.map(alat => {
+          if (alat.kategori === kategoriBersih) {
+            return { ...alat, kategori: 'Lainnya' };
+          }
+          return alat;
+        });
+
+        catatAktivitas(`Menghapus kategori alat: "${kategoriBersih}"`);
+        
+        // 3. Simpan, siarkan, dan paksa render ulang dropdown
         simpanDanSiarkan();
-        renderDropdownKategoriAlat();
+        renderDropdownKategoriAlat(); 
+      } else if (targetHapus) {
+        alert("⚠️ Nama kategori tidak cocok! Penulisan harus sama persis.");
       }
     }
   });
