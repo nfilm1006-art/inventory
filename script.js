@@ -11,6 +11,16 @@ function aturVisibilitasHalaman() {
   if (isLoggedIn) {
     if (loginScreen) loginScreen.classList.add("hidden");
     if (mainScreen) mainScreen.classList.remove("hidden");
+  
+    setTimeout(() => {
+      renderDropdownRak(); // <-- TAMBAHKAN INI DI SINI
+      renderAplikasi();
+    }, 50); 
+  }
+
+  if (isLoggedIn) {
+    if (loginScreen) loginScreen.classList.add("hidden");
+    if (mainScreen) mainScreen.classList.remove("hidden");
     
     setTimeout(() => {
       renderAplikasi();
@@ -288,6 +298,7 @@ channel.onmessage = (event) => {
   products = event.data.products;
   logs = event.data.logs;
   if (event.data.listRak) listRak = event.data.listRak;
+  renderDropdownRak();
   renderAplikasi();
 };
 
