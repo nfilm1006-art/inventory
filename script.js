@@ -1,215 +1,163 @@
-/**
- * GESNT INVENTORY SYSTEM - STANDARD VERSION (NON-MODULE)
- * Solusi anti-stuck halaman login
- */
+// --- 1. STATE & DATA ---
+let dataLogistik = JSON.parse(localStorage.getItem('logistik')) || [];
+let dataPeralatan = JSON.parse(localStorage.getItem('peralatan')) || [];
+let logs = JSON.parse(localStorage.getItem('logs')) || [];
+let rakList = JSON.parse(localStorage.getItem('rakList')) || ["Rak A-1", "Rak A-2"];
+let kategoriList = JSON.parse(localStorage.getItem('kategoriList')) || ["Handtools", "Power-tools", "Safety"];
 
-console.log("🚀 Script.js berhasil dimuat oleh browser!");
-
-document.addEventListener("DOMContentLoaded", function() {
-    // 1. Ambil elemen login secara langsung
-    var formLogin = document.getElementById("formLogin");
-    var hLogin = document.getElementById("halamanLogin");
-    var hUtama = document.getElementById("aplikasiUtama");
-    var errorLogin = document.getElementById("errorLogin");
-    var btnLogout = document.getElementById("btnLogout");
-
-    // 2. Cek Sesi Lama
-    if (localStorage.getItem("gesnt_session") === "aktif") {
-        if (hLogin) hLogin.classList.add("hidden");
-        if (hUtama) hUtama.classList.remove("hidden");
-        inisialisasiDashboard();
+// --- 2. INISIALISASI ---
+document.addEventListener('DOMContentLoaded', () => {
+    // Cek Login
+    if (localStorage.getItem('isLoggedIn') === 'true') {
+        document.getElementById('halamanLogin').classList.add('hidden');
+        document.getElementById('aplikasiUtama').classList.remove('hidden');
     }
-
-    // 3. Logika Tombol Login
-    if (formLogin) {
-        formLogin.addEventListener("submit", function(e) {
-            e.preventDefault(); // Stop refresh halaman
-            
-            var user = document.getElementById("loginUsername").value.trim();
-            var pass = document.getElementById("loginPassword").value.trim();
-
-            console.log("Mencoba login dengan:", user);
-
-            if (user === "Admin" && pass === "gesnt123") {
-                console.log("✅ LOGIN BERHASIL!");
-                localStorage.setItem("gesnt_session", "aktif");
-                
-                if (hLogin) hLogin.classList.add("hidden");
-                if (hUtama) hUtama.classList.remove("hidden");
-                
-                inisialisasiDashboard();
-            } else {
-                console.warn("❌ LOGIN GAGAL!");
-                if (errorLogin) errorLogin.classList.remove("hidden");
-            }
-        });
-    }
-
-    if (btnLogout) {
-        btnLogout.addEventListener("click", function() {
-            localStorage.removeItem("gesnt_session");
-            window.location.reload();
-        });
-    }
+    updateDropdowns();
+    renderAll();
 });
 
-// State Data
-var dataLogistik = [];
-var dataPeralatan = [];
-var listRak = ["Rak A-1", "Rak A-2", "Rak B-1", "Rak B-2"];
-var listKategoriAlat = ["Handtools", "Power-tools", "Safety Equipment", "Measuring"];
-
-function inisialisasiDashboard() {
-    console.log("Memuat komponen dashboard...");
-    updateDropdowns();
-    renderLogistik();
-    renderPeralatan();
-    setupFormListeners();
-}
-
-function updateDropdowns() {
-    var selectRak = document.getElementById("inputRak");
-    var selectKategoriAlat = document.getElementById("inputKategoriAlat");
-    if (selectRak) {
-        selectRak.innerHTML = listRak.map(function(r) { return `<option value="${r}">${r}</option>`; }).join("");
-    }
-    if (selectKategoriAlat) {
-        selectKategoriAlat.innerHTML = listKategoriAlat.map(function(k) { return `<option value="${k}">${k}</option>`; }).join("");
-    }
-}
-
-function renderLogistik() {
-    var tbody = document.getElementById("tabelBodi");
-    if (!tbody) return;
-    tbody.innerHTML = dataLogistik.map(function(item, index) {
-        var total = item.good + item.reject + item.scrap;
-        return `
-            <tr class="hover:bg-slate-800/40 transition">
-                <td class="py-3 px-4 font-medium text-white">${item.nama}</td>
-                <td class="py-3 px-4 text-slate-300">${item.rak}</td>
-                <td class="py-3 px-4 text-center font-bold text-emerald-400">${item.good}</td>
-                <td class="py-3 px-4 text-center font-bold text-rose-400">${item.reject}</td>
-                <td class="py-3 px-4 text-center font-bold text-amber-400">${item.scrap}</td>
-                <td class="py-3 px-4 text-center font-bold text-slate-100">${total}</td>
-                <td class="py-3 px-4 text-center">
-                    <button class="bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 px-2 py-1 rounded-lg border border-rose-500/20 text-xs transition" onclick="hapusLogistik(${index})">Hapus</button>
-                </td>
-            </tr>
-        `;
-    }).join("");
-}
-
-function renderPeralatan() {
-    var tbody = document.getElementById("tabelBodiPeralatan");
-    if (!tbody) return;
-    tbody.innerHTML = dataPeralatan.map(function(item, index) {
-        var statusColor = "text-emerald-400 bg-emerald-500/10 border-emerald-500/20";
-        if (item.kondisi === "Maintenance") statusColor = "text-amber-400 bg-amber-500/10 border-amber-500/20";
-        if (item.kondisi === "Broken") statusColor = "text-rose-400 bg-rose-500/10 border-rose-500/20";
-
-        return `
-            <tr class="hover:bg-slate-800/40 transition">
-                <td class="py-3 px-4 font-medium text-white">${item.nama}</td>
-                <td class="py-3 px-4 text-slate-300">${item.kategori}</td>
-                <td class="py-3 px-4 text-center font-bold text-slate-100">${item.jumlah}</td>
-                <td class="py-3 px-4 text-center">
-                    <span class="px-2.5 py-1 rounded-full text-xs font-semibold border ${statusColor}">${item.kondisi}</span>
-                </td>
-                <td class="py-3 px-4 text-center">
-                    <button class="bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 px-2 py-1 rounded-lg border border-rose-500/20 text-xs transition" onclick="hapusPeralatan(${index})">Hapus</button>
-                </td>
-            </tr>
-        `;
-    }).join("");
-}
-
-function setupFormListeners() {
-    var tabLogistik = document.getElementById("tabLogistik");
-    var tabPeralatan = document.getElementById("tabPeralatan");
-    var checkMassal = document.getElementById("checkInputMassal");
-    var wrapBiasa = document.getElementById("wrapperStokBiasa");
-    var wrapMassal = document.getElementById("wrapperJumlahMassal");
-
-    if (tabLogistik && tabPeralatan) {
-        tabLogistik.onclick = function() { switchTab("logistik"); };
-        tabPeralatan.onclick = function() { switchTab("peralatan"); };
-    }
-
-    if (checkMassal) {
-        checkMassal.onchange = function() {
-            if (this.checked) {
-                wrapBiasa.classList.add("hidden");
-                wrapMassal.classList.remove("hidden");
-            } else {
-                wrapBiasa.classList.remove("hidden");
-                wrapMassal.classList.add("hidden");
-            }
-        };
-    }
-
-    document.getElementById("formBarang").onsubmit = function(e) {
-        e.preventDefault();
-        var nama = document.getElementById("inputNama").value.trim();
-        var rak = document.getElementById("inputRak").value;
-        var good = 0, reject = 0, scrap = 0;
-
-        if (document.getElementById("checkInputMassal").checked) {
-            good = parseInt(document.getElementById("inputTotalMassal").value) || 0;
-        } else {
-            good = parseInt(document.getElementById("inputGood").value) || 0;
-            reject = parseInt(document.getElementById("inputReject").value) || 0;
-            scrap = parseInt(document.getElementById("inputScrap").value) || 0;
-        }
-
-        dataLogistik.push({ nama: nama, rak: rak, good: good, reject: reject, scrap: scrap });
-        this.reset();
-        wrapBiasa.classList.remove("hidden");
-        wrapMassal.classList.add("hidden");
-        renderLogistik();
-    };
-
-    document.getElementById("formPeralatan").onsubmit = function(e) {
-        e.preventDefault();
-        var nama = document.getElementById("inputNamaAlat").value.trim();
-        var kategori = document.getElementById("inputKategoriAlat").value;
-        var jumlah = parseInt(document.getElementById("inputJumlahAlat").value) || 1;
-        var kondisi = document.getElementById("inputKondisiAlat").value;
-
-        dataPeralatan.push({ nama: nama, kategori: kategori, jumlah: jumlah, kondisi: kondisi });
-        this.reset();
-        renderPeralatan();
-    };
-
-    document.getElementById("btnKelolaRak").onclick = function() {
-        var baru = prompt("Masukkan nama Rak baru:");
-        if (baru) { listRak.push(baru); updateDropdowns(); }
-    };
-
-    document.getElementById("btnKelolaKategoriAlat").onclick = function() {
-        var baru = prompt("Masukkan nama Kategori baru:");
-        if (baru) { listKategoriAlat.push(baru); updateDropdowns(); }
-    };
-}
-
-function switchTab(mode) {
-    var formKatLogistik = document.getElementById("formKategoriLogistik");
-    var formKatPeralatan = document.getElementById("formKategoriPeralatan");
-    var halLogistik = document.getElementById("halamanLogistik");
-    var halPeralatan = document.getElementById("halamanPeralatan");
-
-    if (mode === "logistik") {
-        formKatLogistik.classList.remove("hidden");
-        halLogistik.classList.remove("hidden");
-        formKatPeralatan.classList.add("hidden");
-        halPeralatan.classList.add("hidden");
+// --- 3. FUNGSI LOGIN ---
+document.getElementById('formLogin').onsubmit = (e) => {
+    e.preventDefault();
+    if(document.getElementById('loginUsername').value === 'admin' && document.getElementById('loginPassword').value === '123') {
+        localStorage.setItem('isLoggedIn', 'true');
+        location.reload();
     } else {
-        formKatPeralatan.classList.remove("hidden");
-        halPeralatan.classList.remove("hidden");
-        formKatLogistik.classList.add("hidden");
-        halLogistik.classList.add("hidden");
+        document.getElementById('errorLogin').classList.remove('hidden');
     }
+};
+
+document.getElementById('btnLogout').onclick = () => {
+    localStorage.removeItem('isLoggedIn');
+    location.reload();
+};
+
+// --- 4. NAVIGASI TAB ---
+document.getElementById('tabLogistik').onclick = () => {
+    document.getElementById('halamanLogistik').classList.remove('hidden');
+    document.getElementById('halamanPeralatan').classList.add('hidden');
+};
+document.getElementById('tabPeralatan').onclick = () => {
+    document.getElementById('halamanLogistik').classList.add('hidden');
+    document.getElementById('halamanPeralatan').classList.remove('hidden');
+};
+
+// --- 5. DROPDOWN & KELOLA DATA ---
+function updateDropdowns() {
+    const rHTML = rakList.map(r => `<option value="${r}">${r}</option>`).join('');
+    document.getElementById('inputRak').innerHTML = rHTML;
+    document.getElementById('filterRak').innerHTML = `<option value="SEMUA">Semua Rak</option>` + rHTML;
+    
+    const kHTML = kategoriList.map(k => `<option value="${k}">${k}</option>`).join('');
+    document.getElementById('inputKategoriAlat').innerHTML = kHTML;
+    document.getElementById('filterKategoriAlat').innerHTML = `<option value="SEMUA">Semua Kategori</option>` + kHTML;
 }
 
-// Pasang fungsi global agar tombol hapus bawaan table bisa panggil langsung
-window.hapusLogistik = function(idx) { dataLogistik.splice(idx, 1); renderLogistik(); };
-window.hapusPeralatan = function(idx) { dataPeralatan.splice(idx, 1); renderPeralatan(); };
+document.getElementById('btnKelolaRak').onclick = () => {
+    let baru = prompt("Tambah Lokasi Rak (pisahkan koma):");
+    if(baru) { rakList = baru.split(',').map(s => s.trim()); localStorage.setItem('rakList', JSON.stringify(rakList)); updateDropdowns(); }
+};
+
+document.getElementById('btnKelolaKategoriAlat').onclick = () => {
+    let baru = prompt("Tambah Kategori Alat (pisahkan koma):");
+    if(baru) { kategoriList = baru.split(',').map(s => s.trim()); localStorage.setItem('kategoriList', JSON.stringify(kategoriList)); updateDropdowns(); }
+};
+
+// --- 6. LOGIKA UPLOAD & RENDER ---
+function getBase64(file) {
+    return new Promise((resolve) => {
+        let reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.readAsDataURL(file);
+    });
+}
+
+document.getElementById('formBarang').onsubmit = async (e) => {
+    e.preventDefault();
+    const file = document.getElementById('inputFoto').files[0];
+    const data = {
+        nama: document.getElementById('inputNama').value,
+        rak: document.getElementById('inputRak').value,
+        stok: document.getElementById('inputStok').value,
+        min: document.getElementById('inputMin').value,
+        masaKartu: document.getElementById('inputAktifKartu').value,
+        masaKuota: document.getElementById('inputAktifKuota').value,
+        foto: file ? await getBase64(file) : ''
+    };
+    dataLogistik.push(data);
+    addLog(`Tambah Barang: ${data.nama}`);
+    renderAll();
+    e.target.reset();
+};
+
+// --- 7. RENDER TABEL & MONITORING ---
+function renderAll() {
+    // A. Render Tabel Logistik (Tetap)
+    document.getElementById('tabelBodi').innerHTML = dataLogistik.map((item, i) => `
+        <tr class="border-b border-slate-700/30 ${parseInt(item.stok) <= parseInt(item.min) ? 'bg-red-900/20' : ''}">
+            <td class="p-2"><img src="${item.foto}" class="w-10 h-10 object-cover rounded"></td>
+            <td class="p-2 text-left">${item.nama}</td>
+            <td class="p-2">${item.rak}</td>
+            <td class="p-2 font-bold">${item.stok}</td>
+            <td class="p-2 text-xs">${item.min}</td>
+            <td class="p-2 text-xs text-emerald-400">${getDays(item.masaKartu)}h</td>
+            <td class="p-2 text-xs text-emerald-400">${getDays(item.masaKuota)}h</td>
+            <td class="p-2">
+                <button onclick="updateStok(${i},1)" class="bg-slate-700 px-2 rounded">+</button>
+                <button onclick="updateStok(${i},-1)" class="bg-slate-700 px-2 rounded">-</button>
+            </td>
+            <td class="p-2"><button onclick="hapusLog(${i})" class="text-red-500">🗑️</button></td>
+        </tr>
+    `).join('');
+
+    // B. Render Tabel Peralatan (PENTING: Agar daftar peralatan tidak hilang)
+    // Pastikan ID tabel ini sesuai dengan yang ada di HTML Anda (tabelPeralatanBodi)
+    const tbodyPeralatan = document.getElementById('tabelPeralatanBodi');
+    if (tbodyPeralatan) {
+        tbodyPeralatan.innerHTML = dataPeralatan.map((alat, i) => `
+            <tr class="border-b border-slate-700/30">
+                <td class="p-2">${alat.nama}</td>
+                <td class="p-2">${alat.kategori}</td>
+                <td class="p-2">${alat.stok}</td>
+                <td class="p-2">${alat.kondisi}</td>
+                <td class="p-2">${alat.lantai}</td>
+                <td class="p-2">${alat.rak}</td>
+                <td class="p-2"><button onclick="hapusAlat(${i})" class="text-red-500">🗑️</button></td>
+            </tr>
+        `).join('');
+    }
+
+    // C. Render Alarm Panel (Hanya Notifikasi, tidak mengganggu tabel)
+    const kritis = dataLogistik.filter(i => parseInt(i.stok) <= parseInt(i.min) || getDays(i.masaKartu) < 3);
+    document.getElementById('badgeAlert').innerText = `${kritis.length} Terdeteksi`;
+    
+    // Notifikasi hanya diisi ke kontainer khusus notifikasi
+    document.getElementById('kontainerNotifikasi').innerHTML = kritis.map(i => `
+        <div class="bg-red-600/20 p-2 rounded text-[10px] text-red-300 border border-red-500">⚠️ ${i.nama} stok/masa aktif kritis!</div>
+    `).join('');
+
+    // D. Log
+    document.getElementById('kontainerLog').innerHTML = logs.map(l => `<p class="text-[10px] text-slate-400">${l}</p>`).join('');
+    
+    saveAll();
+}
+
+// --- 8. FUNGSI UTILITAS ---
+function getDays(date) { return Math.ceil((new Date(date) - new Date()) / (1000 * 60 * 60 * 24)); }
+function updateStok(i, val) { dataLogistik[i].stok = Math.max(0, parseInt(dataLogistik[i].stok) + val); renderAll(); }
+function hapusLog(i) { dataLogistik.splice(i, 1); renderAll(); }
+document.getElementById('btnBersihkanLog').onclick = () => { logs = []; renderAll(); };
+
+function addLog(msg) { logs.unshift(`[${new Date().toLocaleTimeString()}] ${msg}`); }
+function saveAll() {
+    localStorage.setItem('logistik', JSON.stringify(dataLogistik));
+    localStorage.setItem('logs', JSON.stringify(logs));
+}
+
+// Excel Export
+document.getElementById('btnDownloadExcel').onclick = () => {
+    const ws = XLSX.utils.json_to_sheet(dataLogistik);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Inventaris");
+    XLSX.writeFile(wb, "Data_Gudang.xlsx");
+};
