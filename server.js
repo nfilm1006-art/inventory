@@ -2,96 +2,86 @@ const express = require('express');
 const fs = require('fs');
 const path = require('path');
 const cors = require('cors');
-const os = require('os'); // Modul bawaan Node.js untuk mendeteksi IP jaringan
+const os = require('os');
 
 const app = express();
 const PORT = process.env.PORT || 8080;
 const DB_FILE = path.join(__dirname, 'database.json');
 
-// ==================== MIDDLEWARE UTAMA ====================
+// Middleware wajib
 app.use(cors());
-app.use(express.json({ limit: '50mb' })); // Limit ditinggikan agar lancar upload foto format Base64
-app.use(express.static(__dirname)); // Melayani file static frontend (index.html, script.js, styles.css)
+app.use(express.json({ limit: '50mb' })); 
+app.use(express.static(__dirname)); 
 
-// ==================== HELPER DATABASE FUNGSI ====================
-
-// Fungsi membaca data dari database.json
+// Fungsi membaca database dengan aman
 const bacaDatabase = () => {
   try {
-    // Jika file belum ada, buat file baru dengan struktur kosong bawaan
     if (!fs.existsSync(DB_FILE)) {
-      const strukturAwal = { products: [], tools: [], listRak: [], listKategoriAlat: [], logs: [] };
+      const strukturAwal = { products: [], tools: [], listRak: ["RAK A-1 Depo", "Rak B-2 501", "Gudang Utama"], listKategoriAlat: ["Alat Kerja", "Perangkat IT"], logs: [] };
       fs.writeFileSync(DB_FILE, JSON.stringify(strukturAwal, null, 2), 'utf8');
+      console.log("ℹ️ File database.json baru berhasil dibuat.");
       return strukturAwal;
     }
-    
     const dataRaw = fs.readFileSync(DB_FILE, 'utf8');
+    // Jika file ada tapi isinya kosong melompong, isi dengan struktur dasar
+    if (!dataRaw.trim()) {
+      return { products: [], tools: [], listRak: ["RAK A-1 Depo", "Rak B-2 501"], listKategoriAlat: ["Alat Kerja"], logs: [] };
+    }
     return JSON.parse(dataRaw);
   } catch (error) {
-    console.error("Gagal membaca database, menggunakan data kosong sementara:", error);
+    console.error("❌ Error saat membaca database:", error.message);
     return { products: [], tools: [], listRak: [], listKategoriAlat: [], logs: [] };
   }
 };
 
-// Fungsi menulis/menyimpan data ke database.json
+// Fungsi menulis database ke harddisk secara permanen
 const tulisDatabase = (data) => {
   try {
     fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2), 'utf8');
+    console.log("💾 [BERHASIL] Data sukses dikunci ke database.json!");
     return true;
   } catch (error) {
-    console.error("Gagal menulis data ke database.json:", error);
+    console.error("❌ [GAGAL ENKREPSI] Tidak bisa menulis ke database.json. Alasan:", error.message);
     return false;
   }
 };
 
-// ==================== ROUTING ENDPOINT API ====================
-
-// 1. Jalur GET: Mengambil data untuk dimuat di HP maupun Laptop saat aplikasi dibuka
+// API Endpoint untuk mengambil data
 app.get('/api/gudang', (req, res) => {
-  const dataGudang = bacaDatabase();
-  res.json(dataGudang);
+  console.log("📥 Browser meminta data gudang terbaru...");
+  res.json(bacaDatabase());
 });
 
-// 2. Jalur POST: Menerima data terbaru dari frontend dan disimpan permanen ke database.json
+// API Endpoint untuk menyimpan data
 app.post('/api/gudang', (req, res) => {
-  const dataBaru = req.body;
-  
-  // Validasi sederhana memastikan data yang masuk berstruktur benar
-  if (!dataBaru || typeof dataBaru !== 'object') {
-    return res.status(400).json({ success: false, message: "Format data tidak valid!" });
-  }
-
-  const berhasil = tulisDatabase(dataBaru);
+  console.log("📤 Menerima kiriman data baru dari frontend...");
+  const berhasil = tulisDatabase(req.body);
   if (berhasil) {
-    res.json({ success: true, message: "Database logistik berhasil diperbarui di server pusat." });
+    res.json({ success: true, message: "Database berhasil diperbarui secara permanen." });
   } else {
-    res.status(500).json({ success: false, message: "Gagal menulis perubahan data ke dalam disk server." });
+    res.status(500).json({ success: false, message: "Gagal menulis ke database harian." });
   }
 });
 
-// ==================== LOGIKA DETEKSI IP NETWORK OTOMATIS ====================
+// Mendeteksi IP Wi-Fi otomatis agar HP bisa terhubung
 function dapatkanIPNetwork() {
   const interfaces = os.networkInterfaces();
   for (const name of Object.keys(interfaces)) {
     for (const iface of interfaces[name]) {
-      // Cari alamat IP berjenis IPv4 dan bukan internal localhost (127.0.0.1)
       if (iface.family === 'IPv4' && !iface.internal) {
-        return iface.address; // Kembalikan IP lokal asli (Contoh: 192.168.1.104)
+        return iface.address;
       }
     }
   }
-  return 'localhost'; // Fallback jika tidak terhubung ke Wi-Fi / Jaringan
+  return 'localhost';
 }
 
-// ==================== MENJALANKAN SERVER ====================
+// Menjalankan Server Pusat
 app.listen(PORT, () => {
   const ipLokal = dapatkanIPNetwork();
   console.log(`==================================================`);
-  console.log(`🚀 Server Gudang Aktif Berjalan!`);
-  console.log(`💻 Local (Laptop): http://localhost:${PORT}`);
-  console.log(`📱 Network (HP)   : http://${ipLokal}:${PORT}`);
-  console.log(`==================================================`);
-  console.log(`👉 Silakan buka link 'Network (HP)' di Chrome HP Abang`);
-  console.log(`👉 Pastikan HP dan Laptop terhubung ke Wi-Fi yang sama`);
+  console.log(`🚀 SERVER GUDANG AKTIF DAN BERJALAN LOG!`);
+  console.log(`💻 Link Laptop : http://localhost:${PORT}`);
+  console.log(`📱 Link HP     : http://${ipLokal}:${PORT}`);
   console.log(`==================================================`);
 });
