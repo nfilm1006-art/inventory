@@ -1,10 +1,10 @@
 // ==========================================================================
-// SEKTOR 1: AUTHENTICATION, CONFIG & ROUTING
+// SEKTOR 1: AUTHENTICATION, CONFIG & ROUTING (VERSI AMAN / ANTI-MACET)
 // ==========================================================================
 const ADMIN_USERNAME = "Admin";
 const ADMIN_PASSWORD = "gesnt123";
 
-// URL Database Baru untuk project Gesnt Abang (Otomatis membuat berkas gudang.json)
+// URL Database Baru untuk project Gesnt Abang (Otomatis diarahkan ke database cloud baru)
 const FIREBASE_DB_URL = "https://gesnt-f5eb1-default-rtdb.asia-southeast1.firebasedatabase.app/gudang.json";
 
 let isLoggedIn = localStorage.getItem("gudang_session") === "true";
@@ -13,15 +13,19 @@ function aturVisibilitasHalaman() {
   const loginScreen = document.getElementById("halamanLogin");
   const mainScreen = document.getElementById("aplikasiUtama");
 
+  // PENGAMAN: Jika salah satu elemen screen tidak ada di HTML, langsung muat data agar fungsi lain tidak macet
+  if (!loginScreen || !mainScreen) {
+    muatDataDariServer();
+    return;
+  }
+
   if (isLoggedIn) {
-    if (loginScreen) loginScreen.classList.add("hidden");
-    if (mainScreen) mainScreen.classList.remove("hidden");
-    
-    // Ambil data terbaru dari Cloud Firebase begitu berhasil masuk
+    loginScreen.classList.add("hidden");
+    mainScreen.classList.remove("hidden");
     muatDataDariServer();
   } else {
-    if (loginScreen) loginScreen.classList.remove("hidden");
-    if (mainScreen) mainScreen.classList.add("hidden");
+    loginScreen.classList.remove("hidden");
+    mainScreen.classList.add("hidden");
   }
 }
 
@@ -30,8 +34,12 @@ const loginForm = document.getElementById("loginForm");
 if (loginForm) {
   loginForm.addEventListener("submit", function (e) {
     e.preventDefault();
-    const userIn = document.getElementById("username").value;
-    const passIn = document.getElementById("password").value;
+    const uEl = document.getElementById("username");
+    const pEl = document.getElementById("password");
+    if (!uEl || !pEl) return;
+
+    const userIn = uEl.value;
+    const passIn = pEl.value;
 
     if (userIn === ADMIN_USERNAME && passIn === ADMIN_PASSWORD) {
       isLoggedIn = true;
@@ -52,16 +60,21 @@ function logout() {
   tampilkanNotifikasi("Berhasil keluar sistem.", "info");
 }
 
-// Navigasi Tab Dashboard Utama
+// Navigasi Tab Dashboard Utama (Dilengkapi Pengaman Anti-Freeze)
 function gantiTab(tabId) {
   const semuaTab = ["tabDashboard", "tabBarang", "tabAlat", "tabPengaturan", "tabLog"];
+  
   semuaTab.forEach(id => {
     const el = document.getElementById(id);
-    if (el) el.classList.add("hidden");
+    if (el) el.classList.add("hidden"); // Hanya disembunyikan jika elemennya memang ada
   });
 
   const tabAktif = document.getElementById(tabId);
-  if (tabAktif) tabAktif.classList.remove("hidden");
+  if (tabAktif) {
+    tabAktif.classList.remove("hidden");
+  } else {
+    console.warn(`⚠️ Peringatan: Elemen tab dengan ID "${tabId}" tidak ditemukan di HTML.`);
+  }
 
   // Atur styling tombol navigasi yang aktif
   const semuaTombol = document.querySelectorAll(".nav-btn");
@@ -101,7 +114,8 @@ async function muatDataDariServer() {
     refreshSemuaKomponenUI();
   } catch (error) {
     console.error("⚠️ Masalah sinkronisasi Firebase:", error);
-    tampilkanNotifikasi("Gagal memuat data dari cloud. Berjalan dalam mode lokal.", "error");
+    // Jika gagal terkoneksi cloud, aplikasi tetap melakukan render data lokal agar tidak macet
+    refreshSemuaKomponenUI();
   }
 }
 
@@ -109,7 +123,7 @@ async function muatDataDariServer() {
 async function simpanDanSiarkan() {
   const dataGudang = { products, tools, listRak, listKategoriAlat, logs };
   
-  // Render UI lokal terlebih dahulu agar aplikasi terasa instan tanpa delay
+  // Render UI lokal terlebih dahulu agar aplikasi terasa instan dan responsif
   refreshSemuaKomponenUI();
 
   try {
@@ -120,7 +134,7 @@ async function simpanDanSiarkan() {
     });
   } catch (error) {
     console.error("❌ Sinkronisasi Cloud Gagal:", error);
-    tampilkanNotifikasi("Gagal mencadangkan ke cloud. Periksa internet Anda.", "error");
+    tampilkanNotifikasi("Gagal mencadangkan ke cloud. Menunggu jaringan...", "error");
   }
 }
 
@@ -173,17 +187,29 @@ function renderTabelBarang() {
 
 function tambahBarangBaru(e) {
   e.preventDefault();
-  const nama = document.getElementById("pNama").value;
-  const rak = document.getElementById("pRak").value;
-  const stok = parseInt(document.getElementById("pStok").value) || 0;
-  const hargaBeli = parseInt(document.getElementById("pHargaBeli").value) || 0;
-  const hargaJual = parseInt(document.getElementById("pHargaJual").value) || 0;
-  const fileFoto = document.getElementById("pFoto").files[0];
+  const namaEl = document.getElementById("pNama");
+  const rakEl = document.getElementById("pRak");
+  const stokEl = document.getElementById("pStok");
+  const beliEl = document.getElementById("pHargaBeli");
+  const jualEl = document.getElementById("pHargaJual");
+  const fotoEl = document.getElementById("pFoto");
+
+  if (!namaEl || !rakEl) return;
+
+  const nama = namaEl.value;
+  const rak = rakEl.value;
+  const stok = stokEl ? (parseInt(stokEl.value) || 0) : 0;
+  const hargaBeli = beliEl ? (parseInt(beliEl.value) || 0) : 0;
+  const hargaJual = jualEl ? (parseInt(jualEl.value) || 0) : 0;
+  const fileFoto = fotoEl ? fotoEl.files[0] : null;
 
   const prosesSimpan = (fotoBase64) => {
     products.push({ nama, rak, stok, hargaBeli, hargaJual, foto: fotoBase64 });
     tulisLog(`Menambahkan barang baru: ${nama} sebanyak ${stok} unit di ${rak}`);
-    document.getElementById("formTambahBarang").reset();
+    
+    const form = document.getElementById("formTambahBarang");
+    if (form) form.reset();
+    
     simpanDanSiarkan();
     tampilkanNotifikasi("Barang baru berhasil ditambahkan!", "success");
   };
@@ -253,15 +279,26 @@ function renderTabelAlat() {
 
 function tambahAlatBaru(e) {
   e.preventDefault();
-  const nama = document.getElementById("tNama").value;
-  const kategori = document.getElementById("tKategori").value;
-  const jumlah = parseInt(document.getElementById("tJumlah").value) || 0;
-  const status = document.getElementById("tStatus").value;
-  const keterangan = document.getElementById("tKeterangan").value;
+  const namaEl = document.getElementById("tNama");
+  const katEl = document.getElementById("tKategori");
+  const jumEl = document.getElementById("tJumlah");
+  const statEl = document.getElementById("tStatus");
+  const ketEl = document.getElementById("tKeterangan");
+
+  if (!namaEl || !katEl) return;
+
+  const nama = namaEl.value;
+  const kategori = katEl.value;
+  const jumlah = jumEl ? (parseInt(jumEl.value) || 0) : 0;
+  const status = statEl ? statEl.value : "Tersedia";
+  const keterangan = ketEl ? ketEl.value : "";
 
   tools.push({ nama, kategori, jumlah, status, keterangan });
   tulisLog(`Menambahkan aset alat: ${nama} (${jumlah} unit) - Status: ${status}`);
-  document.getElementById("formTambahAlat").reset();
+  
+  const form = document.getElementById("formTambahAlat");
+  if (form) form.reset();
+
   simpanDanSiarkan();
   tampilkanNotifikasi("Alat kerja berhasil didaftarkan!", "success");
 }
@@ -284,16 +321,17 @@ function hapusAlat(index) {
 
 
 // ==========================================================================
-// SEKTOR 5: DASHBOARD ANALYTICS & LOGIC KALKULASI PENGELUARAN OPERASIONAL
+// SEKTOR 5: DASHBOARD ANALYTICS & LOGIC KALKULASI PENGELUARAN
 // ==========================================================================
 function renderDashboard() {
-  // Ambil nilai pengeluaran operasional dari LocalStorage (bersifat dinamis per perangkat/sesi kerja)
   const biayaTenagaKerja = parseInt(localStorage.getItem("ops_tenaga_kerja")) || 0;
   const biayaTransport = parseInt(localStorage.getItem("ops_transport")) || 0;
 
-  // Set nilai input agar tidak hilang saat halaman di-refresh
-  if (document.getElementById("inputTenagaKerja")) document.getElementById("inputTenagaKerja").value = biayaTenagaKerja;
-  if (document.getElementById("inputTransport")) document.getElementById("inputTransport").value = biayaTransport;
+  // Set nilai input di halaman agar sinkron saat refresh halaman
+  const tkInput = document.getElementById("inputTenagaKerja");
+  const tpInput = document.getElementById("inputTransport");
+  if (tkInput) tkInput.value = biayaTenagaKerja;
+  if (tpInput) tpInput.value = biayaTransport;
 
   let totalStokBarang = 0;
   let totalAsetAlat = 0;
@@ -310,37 +348,36 @@ function renderDashboard() {
     totalAsetAlat += t.jumlah;
   });
 
-  // Perhitungan Keuntungan Kotor dan Keuntungan Bersih (Dikurangi Biaya Tenaga Kerja & Transportasi)
   const untungKotor = akumulasiOmzetJual - akumulasiModalBeli;
   const totalPengeluaranTambahan = biayaTenagaKerja + biayaTransport;
   const untungBersih = untungKotor - totalPengeluaranTambahan;
 
-  // Suntik Nilai ke Elemen Dashboard Ringkasan
-  if (document.getElementById("dashStokBarang")) document.getElementById("dashStokBarang").innerText = totalStokBarang.toLocaleString();
-  if (document.getElementById("dashTotalAlat")) document.getElementById("dashTotalAlat").innerText = totalAsetAlat.toLocaleString();
-  if (document.getElementById("dashModalBeli")) document.getElementById("dashModalBeli").innerText = "Rp " + akumulasiModalBeli.toLocaleString();
+  // Isi data ke card summary dashboard jika elemennya eksis
+  const dStok = document.getElementById("dashStokBarang");
+  const dAlat = document.getElementById("dashTotalAlat");
+  const dModal = document.getElementById("dashModalBeli");
+  const dUntung = document.getElementById("dashUntungBersih");
+
+  if (dStok) dStok.innerText = totalStokBarang.toLocaleString();
+  if (dAlat) dAlat.innerText = totalAsetAlat.toLocaleString();
+  if (dModal) dModal.innerText = "Rp " + akumulasiModalBeli.toLocaleString();
   
-  const elUntungBersih = document.getElementById("dashUntungBersih");
-  if (elUntungBersih) {
-    elUntungBersih.innerText = "Rp " + untungBersih.toLocaleString();
-    if (untungBersih < 0) {
-      elUntungBersih.className = "text-2xl font-bold text-rose-600";
-    } else {
-      elUntungBersih.className = "text-2xl font-bold text-emerald-600";
-    }
+  if (dUntung) {
+    dUntung.innerText = "Rp " + untungBersih.toLocaleString();
+    dUntung.className = untungBersih < 0 ? "text-2xl font-bold text-rose-600" : "text-2xl font-bold text-emerald-600";
   }
 }
 
-// Fungsi Trigger Saat Mengubah Nilai Input Pengeluaran Tenaga Kerja & Transport
 function hitungUlangOperasional() {
-  const biayaTenagaKerja = parseInt(document.getElementById("inputTenagaKerja").value) || 0;
-  const biayaTransport = parseInt(document.getElementById("inputTransport").value) || 0;
+  const tkInput = document.getElementById("inputTenagaKerja");
+  const tpInput = document.getElementById("inputTransport");
 
-  // Kunci ke penyimpanan lokal agar persisten
+  const biayaTenagaKerja = tkInput ? (parseInt(tkInput.value) || 0) : 0;
+  const biayaTransport = tpInput ? (parseInt(tpInput.value) || 0) : 0;
+
   localStorage.setItem("ops_tenaga_kerja", biayaTenagaKerja);
   localStorage.setItem("ops_transport", biayaTransport);
 
-  // Kalkulasi ulang seluruh layar utama
   renderDashboard();
   tampilkanNotifikasi("Biaya operasional diperbarui!", "info");
 }
@@ -352,8 +389,6 @@ function hitungUlangOperasional() {
 function tulisLog(pesan) {
   const waktu = new Date().toLocaleString("id-ID", { timeZone: "Asia/Jakarta" });
   logs.unshift({ waktu, pesan });
-  
-  // Batasi agar riwayat log cloud tidak membengkak terlalu besar (Max 150 baris)
   if (logs.length > 150) logs.pop();
 }
 
@@ -379,7 +414,6 @@ function renderRiwayatLog() {
 }
 
 function renderOpsiPengaturan() {
-  // Update pilihan lokasi Rak pada Dropdown Form Tambah Barang
   const pRakSelect = document.getElementById("pRak");
   if (pRakSelect) {
     pRakSelect.innerHTML = "";
@@ -388,7 +422,6 @@ function renderOpsiPengaturan() {
     });
   }
 
-  // Update pilihan Kategori Alat pada Dropdown Form Tambah Alat
   const tKategoriSelect = document.getElementById("tKategori");
   if (tKategoriSelect) {
     tKategoriSelect.innerHTML = "";
@@ -397,7 +430,6 @@ function renderOpsiPengaturan() {
     });
   }
 
-  // Render Daftar List Manajemen Rak di Tab Pengaturan
   const listRakContainer = document.getElementById("listRakPengaturan");
   if (listRakContainer) {
     listRakContainer.innerHTML = "";
@@ -415,6 +447,7 @@ function renderOpsiPengaturan() {
 function tambahOpsiPengaturan(jenis) {
   if (jenis === 'rak') {
     const input = document.getElementById("inputRakBaru");
+    if (!input) return;
     const nilai = input.value.trim();
     if (nilai && !listRak.includes(nilai)) {
       listRak.push(nilai);
@@ -427,7 +460,7 @@ function tambahOpsiPengaturan(jenis) {
 
 function hapusOpsiPengaturan(jenis, idx) {
   if (jenis === 'rak') {
-    tulisLog(`Menghapus opsi lokasi rak: ${listRak[idx]}`);
+    tulisLog(`Mengaruh opsi lokasi rak: ${listRak[idx]}`);
     listRak.splice(idx, 1);
     simpanDanSiarkan();
   }
@@ -444,10 +477,12 @@ function bersihkanSeluruhLog() {
 
 
 // ==========================================================================
-// SEKTOR 7: FITUR CETAK LAPORAN LAPORAN (PRINT PREVIEW)
+// SEKTOR 7: FITUR CETAK LAPORAN (PRINT PREVIEW)
 // ==========================================================================
 function cetakLaporanGudang() {
   const w = window.open();
+  if (!w) return;
+  
   let barisBarang = "";
   let akumulasiModal = 0;
   let akumulasiOmzet = 0;
@@ -484,7 +519,7 @@ function cetakLaporanGudang() {
         h2 { margin-bottom: 5px; color: #047857; }
         table { width: 100%; border-collapse: collapse; margin-top: 20px; }
         th, td { border: 1px solid #ddd; padding: 8px; text-align: left; font-size: 13px; }
-        th { bg-color: #f4f4f5; font-weight: bold; }
+        th { background-color: #f4f4f5; font-weight: bold; }
         .ringkasan { margin-top: 30px; float: right; width: 350px; }
         .ringkasan table td { border: none; padding: 4px; font-size: 14px; }
       </style>
@@ -566,7 +601,6 @@ function createToastContainer() {
 
 // Inisialisasi Aplikasi Saat Browser Selesai Dimuat
 document.addEventListener("DOMContentLoaded", function () {
-  // Pasang trigger event ke submit form
   const fBarang = document.getElementById("formTambahBarang");
   if (fBarang) fBarang.addEventListener("submit", tambahBarangBaru);
 
