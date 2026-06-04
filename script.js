@@ -134,7 +134,6 @@ function renderDropdownRak() {
   const cachedInput = inputRakSelect.value;
   const cachedFilter = filterRakSelect.value || 'SEMUA';
 
-  // Kosongkan opsi lama
   inputRakSelect.innerHTML = '';
   
   listRak.forEach(rak => {
@@ -164,7 +163,6 @@ function renderDropdownKategoriAlat() {
   const cachedInput = inputKategori.value;
   const cachedFilter = filterKategori.value || 'SEMUA';
 
-  // Mengosongkan isi dropdown lama agar saat dihapus langsung sinkron berubah
   inputKategori.innerHTML = '';
   filterKategori.innerHTML = '<option value="SEMUA">✨ Semua Kategori</option>';
 
@@ -310,7 +308,7 @@ function renderAplikasi() {
   });
 }
 
-// RENDER DATA PERALATAN (TRIPLE FILTER + DETAIL POSISI STRING)
+// RENDER DATA PERALATAN (TRIPLE FILTER + DETAIL POSISI STRING + EDIT LANTAI & KATEGORI)
 function renderPeralatan() {
   const tabelAlat = document.getElementById('tabelPeralatanBodi');
   if (!tabelAlat) return;
@@ -322,7 +320,6 @@ function renderPeralatan() {
   tabelAlat.innerHTML = '';
   
   tools.forEach(alat => {
-    // Jalankan filtering multiparameter
     if (filterKategori !== 'SEMUA' && alat.kategori !== filterKategori) return;
     if (filterKondisi !== 'SEMUA' && alat.kondisi !== filterKondisi) return;
     if (filterLantai !== 'SEMUA' && (alat.lantai || 'Lantai 1') !== filterLantai) return;
@@ -336,11 +333,19 @@ function renderPeralatan() {
     tr.className = 'hover:bg-slate-750 transition-colors border-b border-slate-700/50';
     tr.innerHTML = `
       <td class="px-4 py-3 text-left font-medium text-white break-words">${alat.nama}</td>
-      <td class="px-4 py-3 text-center text-slate-400 text-xs">${alat.kategori}</td>
+      <td class="px-4 py-3 text-center whitespace-nowrap">
+        <div class="flex items-center justify-center gap-1.5">
+          <span class="text-slate-400 text-xs">${alat.kategori}</span>
+          <button data-id="${alat.id}" class="btn-edit-kategori text-slate-500 hover:text-cyan-400 transition" title="Ubah Kategori">✏️</button>
+        </div>
+      </td>
       <td class="px-4 py-3 text-center font-bold text-cyan-400 font-mono">${alat.stok} Unit</td>
       <td class="px-4 py-3 text-center whitespace-nowrap">${badgeKondisi}</td>
       <td class="px-4 py-3 text-center whitespace-nowrap">
-        <span class="bg-slate-900 px-2 py-0.5 rounded text-cyan-400 border border-slate-700 text-xs font-semibold">${alat.lantai || 'Lantai 1'}</span>
+        <div class="flex items-center justify-center gap-1.5">
+          <span class="bg-slate-900 px-2 py-0.5 rounded text-cyan-400 border border-slate-700 text-xs font-semibold">${alat.lantai || 'Lantai 1'}</span>
+          <button data-id="${alat.id}" class="btn-edit-lantai text-slate-500 hover:text-cyan-400 transition" title="Ubah Lantai">✏️</button>
+        </div>
       </td>
       <td class="px-4 py-3 text-left text-slate-300 text-xs break-words">${alat.rak || 'Belum diatur'}</td>
       <td class="px-4 py-3 text-center whitespace-nowrap">
@@ -409,7 +414,7 @@ if (document.getElementById('btnKelolaRak')) {
   });
 }
 
-// KELOLA PILIHAN KATEGORI ALAT (SUDAH DIPERBAIKI SINKRONISASI DROPDOWN)
+// KELOLA PILIHAN KATEGORI ALAT
 if (document.getElementById('btnKelolaKategoriAlat')) {
   document.getElementById('btnKelolaKategoriAlat').addEventListener('click', () => {
     const menuOpsi = prompt("⚙️ KELOLA PILIHAN KATEGORI PERALATAN\n\nKetik '1' : TAMBAH Kategori Baru\nKetik '2' : HAPUS Kategori");
@@ -433,10 +438,8 @@ if (document.getElementById('btnKelolaKategoriAlat')) {
       if (targetHapus && listKategoriAlat.includes(targetHapus.trim())) {
         const kategoriBersih = targetHapus.trim();
         
-        // 1. Hapus dari array list kategori
         listKategoriAlat = listKategoriAlat.filter(k => k !== kategoriBersih);
         
-        // 2. Alihkan peralatan yang kategorinya terhapus ke 'Lainnya' agar tidak error
         tools = tools.map(alat => {
           if (alat.kategori === kategoriBersih) {
             return { ...alat, kategori: 'Lainnya' };
@@ -446,7 +449,6 @@ if (document.getElementById('btnKelolaKategoriAlat')) {
 
         catatAktivitas(`Menghapus kategori alat: "${kategoriBersih}"`);
         
-        // 3. Simpan dan paksa gambar ulang dropdown
         simpanDanSiarkan();
         renderDropdownKategoriAlat(); 
       } else if (targetHapus) {
@@ -467,7 +469,7 @@ document.getElementById('checkInputMassal').addEventListener('change', (e) => {
 document.getElementById('formBarang').addEventListener('submit', (e) => {
   e.preventDefault();
   const nama = document.getElementById('inputNama').value;
-  const rak = document.getElementById('inputRak').value; // Dropdown value
+  const rak = document.getElementById('inputRak').value; 
   const fileFoto = document.getElementById('inputFoto').files[0];
   const aktifKartu = document.getElementById('inputAktifKartu').value;
   const aktifKuota = document.getElementById('inputAktifKuota').value;
@@ -504,7 +506,7 @@ document.getElementById('formBarang').addEventListener('submit', (e) => {
   }
 });
 
-// SUBMIT FORM DATA PERALATAN BARU (MENDUKUNG LANTAI & DETAIL POSISI STRING)
+// SUBMIT FORM DATA PERALATAN BARU (DETAIL POSISI STRING)
 document.getElementById('formPeralatan').addEventListener('submit', (e) => {
   e.preventDefault();
   const nama = document.getElementById('inputNamaAlat').value;
@@ -512,7 +514,7 @@ document.getElementById('formPeralatan').addEventListener('submit', (e) => {
   const stok = Number(document.getElementById('inputStokAlat').value) || 0;
   const kondisi = document.getElementById('inputKondisiAlat').value;
   const lantai = document.getElementById('inputLantaiAlat').value;
-  const rak = document.getElementById('inputRakAlat').value; // Mengambil string kustom bebas
+  const rak = document.getElementById('inputRakAlat').value; 
 
   const alatBaru = { id: 'alat-' + Date.now(), nama, kategori, stok, kondisi, lantai, rak };
   tools.push(alatBaru);
@@ -568,23 +570,86 @@ document.getElementById('tabelBodi').addEventListener('click', (e) => {
   simpanDanSiarkan();
 });
 
-// EVENT CLICK TABLE PERALATAN (HAPUS DATA ALAT)
+// EVENT CLICK TABLE PERALATAN (MENDUKUNG HAPUS DATA, EDIT LANTAI, & EDIT KATEGORI)
 document.getElementById('tabelPeralatanBodi').addEventListener('click', (e) => {
-  const tombol = e.target.closest('.btn-hapus-alat');
-  if (!tombol) return;
-  const id = tombol.getAttribute('data-id');
-  const alatTerpilih = tools.find(t => t.id === id);
-  if (!alatTerpilih) return;
+  // 1. Logika untuk tombol Hapus Alat
+  const tombolHapus = e.target.closest('.btn-hapus-alat');
+  if (tombolHapus) {
+    const id = tombolHapus.getAttribute('data-id');
+    const alatTerpilih = tools.find(t => t.id === id);
+    if (!alatTerpilih) return;
 
-  if (confirm(`Hapus peralatan "${alatTerpilih.nama}" dari inventaris kerja?`)) {
-    catatAktivitas(`🛠️ Menghapus peralatan kerja "${alatTerpilih.nama}"`);
-    tools = tools.filter(t => t.id !== id);
-    simpanDanSiarkan();
+    if (confirm(`Hapus peralatan "${alatTerpilih.nama}" dari inventaris kerja?`)) {
+      catatAktivitas(`🛠️ Menghapus peralatan kerja "${alatTerpilih.nama}"`);
+      tools = tools.filter(t => t.id !== id);
+      simpanDanSiarkan();
+    }
+    return;
+  }
+
+  // 2. Logika untuk tombol Edit Lantai Alat (✏️)
+  const tombolEditLantai = e.target.closest('.btn-edit-lantai');
+  if (tombolEditLantai) {
+    const id = tombolEditLantai.getAttribute('data-id');
+    const alatTerpilih = tools.find(t => t.id === id);
+    if (!alatTerpilih) return;
+
+    const lantaiSekarang = alatTerpilih.lantai || 'Lantai 1';
+    const menuPrompt = prompt(
+      `⚙️ PINDAHKAN LOKASI LANTAI\n\nAlat: "${alatTerpilih.nama}"\nPosisi Saat Ini: ${lantaiSekarang}\n\nKetik '1' untuk pindah ke Lantai 1\nKetik '2' untuk pindah ke Lantai 2`
+    );
+
+    if (menuPrompt === '1') {
+      if (alatTerpilih.lantai === 'Lantai 1') { alert("Peralatan memang sudah berada di Lantai 1."); return; }
+      alatTerpilih.lantai = 'Lantai 1';
+      catatAktivitas(`🛠️ Memindahkan "${alatTerpilih.nama}" ke Lantai 1`);
+      simpanDanSiarkan();
+    } else if (menuPrompt === '2') {
+      if (alatTerpilih.lantai === 'Lantai 2') { alert("Peralatan memang sudah berada di Lantai 2."); return; }
+      alatTerpilih.lantai = 'Lantai 2';
+      catatAktivitas(`🛠️ Memindahkan "${alatTerpilih.nama}" ke Lantai 2`);
+      simpanDanSiarkan();
+    } else if (menuPrompt !== null) {
+      alert("⚠️ Pilihan tidak valid! Harap ketik angka 1 atau 2.");
+    }
+    return;
+  }
+
+  // 3. Logika untuk tombol Edit Kategori Alat (✏️)
+  const tombolEditKategori = e.target.closest('.btn-edit-kategori');
+  if (tombolEditKategori) {
+    const id = tombolEditKategori.getAttribute('data-id');
+    const alatTerpilih = tools.find(t => t.id === id);
+    if (!alatTerpilih) return;
+
+    let promptTeks = `⚙️ UBAH KATEGORI PERALATAN\n\nAlat: "${alatTerpilih.nama}"\nKategori Saat Ini: ${alatTerpilih.kategori}\n\nKetik nomor kategori tujuan:\n`;
+    listKategoriAlat.forEach((kat, idx) => {
+      promptTeks += `${idx + 1}. ${kat}\n`;
+    });
+
+    const pilihanIdx = prompt(promptTeks);
+    if (pilihanIdx !== null) {
+      const nomorUbah = parseInt(pilihanIdx.trim()) - 1;
+      
+      if (nomorUbah >= 0 && nomorUbah < listKategoriAlat.length) {
+        const kategoriBaru = listKategoriAlat[nomorUbah];
+        if (alatTerpilih.kategori === kategoriBaru) {
+          alert(`Peralatan memang sudah masuk dalam kategori "${kategoriBaru}".`);
+          return;
+        }
+        const kategoriLama = alatTerpilih.kategori;
+        alatTerpilih.kategori = kategoriBaru;
+        catatAktivitas(`🛠️ Mengubah kategori "${alatTerpilih.nama}" dari "${kategoriLama}" ke "${kategoriBaru}"`);
+        simpanDanSiarkan();
+      } else {
+        alert("⚠️ Nomor yang Anda masukkan salah atau tidak ada dalam daftar!");
+      }
+    }
   }
 });
 
 document.getElementById('btnBersihkanLog').addEventListener('click', () => {
-  if (prompt("🔐 Masukkan password admin:") === "gudang123") {
+  if (prompt("🔐 Masukkan password admin:") === "gesnt123") {
     logs = [{ teks: "Log dibersihkan oleh Admin Utama.", waktu: `${new Date().toLocaleDateString('id-ID')} ${new Date().toLocaleTimeString('id-ID')}` }];
     simpanDanSiarkan();
   }
@@ -613,5 +678,4 @@ setInterval(() => {
   }
 }, 1000);
 
-// Eksekusi sistem saat file pertama kali dimuat
 aturVisibilitasHalaman();
