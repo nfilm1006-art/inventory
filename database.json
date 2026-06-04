@@ -1,0 +1,17 @@
+{
+    "products": [
+      { "id": "1", "nama": "Kabel Belden Cat5", "stok": 220, "minimalStok": 10, "rak": "RAK A-1 Depo", "foto": "", "aktifKartu": "", "aktifKuota": "" },
+      { "id": "2", "nama": "Perdana Internet 15GB - 1", "stok": 1, "minimalStok": 0, "rak": "Rak B-2 501", "foto": "", "aktifKartu": "2026-12-31", "aktifKuota": "2026-07-15" }
+    ],
+    "tools": [
+      { "id": "p1", "nama": "Tang Krimping RJ45 Probe", "kategori": "Alat Kerja", "stok": 3, "kondisi": "BAGUS", "lantai": "Lantai 1", "rak": "Gudang Utama Bawah" },
+      { "id": "p2", "nama": "Solder Listrik 60W", "kategori": "Alat Kerja", "stok": 1, "kondisi": "RUSAK RINGAN", "lantai": "Lantai 2", "rak": "Lemari Perkakas Slot C" }
+    ],
+    "listRak": ["RAK A-1 Depo", "Rak B-2 501", "Rak C-1 501", "Gudang Utama", "Lainnya"],
+    "listKategoriAlat": ["Alat Kerja", "Perangkat IT", "Safety Gear", "Lainnya"],
+    "logs": [
+      { "teks": "Sistem diinisialisasi menggunakan database server.", "waktu": "04/06/2026 19:50:00" }
+    ]
+    
+  }
+  

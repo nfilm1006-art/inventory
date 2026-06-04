@@ -12,13 +12,8 @@ function aturVisibilitasHalaman() {
     if (loginScreen) loginScreen.classList.add("hidden");
     if (mainScreen) mainScreen.classList.remove("hidden");
     
-    // Beri jeda sedikit agar DOM siap sebelum rendering
-    setTimeout(() => {
-      renderDropdownRak();
-      renderDropdownKategoriAlat();
-      renderAplikasi();
-      renderPeralatan();
-    }, 50); 
+    // Tarik data dari server.js terlebih dahulu sebelum rendering UI
+    muatDataDariServer();
   } else {
     if (loginScreen) loginScreen.classList.remove("hidden");
     if (mainScreen) mainScreen.classList.add("hidden");
@@ -37,8 +32,6 @@ document.getElementById("formLogin").addEventListener("submit", (e) => {
     if (errMsg) errMsg.classList.add("hidden");
     e.target.reset();
     aturVisibilitasHalaman();
-    catatAktivitas("🔑 Pengguna 'admin' berhasil login ke sistem.");
-    simpanDanSiarkan();
   } else {
     if (errMsg) errMsg.classList.remove("hidden");
   }
@@ -76,32 +69,77 @@ if (tabLogistik && tabPeralatan) {
 }
 
 
-// ==================== SEKTOR 2: MANAGEMEN LOGISTIK & PERALATAN GUDANG ====================
+// ==================== SEKTOR 2: MANAGEMENT LOGISTIK & PERALATAN (API SERVER) ====================
 const placeholderImg = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><rect width='18' height='18' x='3' y='3' rx='2' ry='2'/><circle cx='9' cy='9' r='2'/><path d='m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21'/></svg>";
 
-const initialInventory = [
-  { id: '1', nama: 'Kabel Belden Cat5', stok: 220, minimalStok: 10, rak: 'RAK A-1 Depo', foto: placeholderImg, aktifKartu: "", aktifKuota: "" },
-  { id: '2', nama: 'Perdana Internet 15GB - 1', stok: 1, minimalStok: 0, rak: 'Rak B-2 501', foto: placeholderImg, aktifKartu: "2026-12-31", aktifKuota: "2026-07-15" }
-];
+// Variabel utama (Sekarang datanya dikendalikan dari server backend database.json)
+let products = [];
+let tools = [];
+let listRak = [];
+let listKategoriAlat = [];
+let logs = [];
 
-const initialPeralatan = [
-  { id: 'p1', nama: 'Tang Krimping RJ45 Probe', kategori: 'Alat Kerja', stok: 3, kondisi: 'BAGUS', lantai: 'Lantai 1', rak: 'Gudang Utama Bawah' },
-  { id: 'p2', nama: 'Solder Listrik 60W', kategori: 'Alat Kerja', stok: 1, kondisi: 'RUSAK RINGAN', lantai: 'Lantai 2', rak: 'Lemari Perkakas Slot C' }
-];
+// FUNGSI API 1: AMBIL DATA DARI SERVER.JS
+async function muatDataDariServer() {
+  try {
+    const response = await fetch('/api/gudang');
+    if (!response.ok) throw new Error("Gagal merespon server.");
+    const data = await response.json();
+    
+    products = data.products || [];
+    tools = data.tools || [];
+    listRak = data.listRak || [];
+    listKategoriAlat = data.listKategoriAlat || [];
+    logs = data.logs || [];
+    
+    // Setelah data ditarik, gambar komponen UI
+    renderDropdownRak();
+    renderDropdownKategoriAlat();
+    renderAplikasi();
+    renderPeralatan();
+  } catch (error) {
+    console.error("Error mengambil data server:", error);
+  }
+}
 
-const initialRacks = ['RAK A-1 Depo', 'Rak B-2 501', 'Rak C-1 501', 'Gudang Utama', 'Lainnya'];
-const initialCategories = ['Alat Kerja', 'Perangkat IT', 'Safety Gear', 'Lainnya'];
+// FUNGSI API 2: SIMPAN DATA UTUH KE SERVER.JS (MENGGANTIKAN LOCALSTORAGE)
+async function simpanDanSiarkan() {
+  const dataGudang = { products, tools, listRak, listKategoriAlat, logs };
+  
+  try {
+    // 1. Simpan permanen ke server database.json
+    const response = await fetch('/api/gudang', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(dataGudang)
+    });
+    const hasil = await response.json();
+    
+    // 2. Render perubahan visual di web saat ini
+    renderAplikasi();
+    renderPeralatan();
+    
+    // 3. Sinkronkan tab lain jika terbuka di browser yang sama
+    const channel = new BroadcastChannel('gudang_realtime_total_channel');
+    channel.postMessage(dataGudang);
+  } catch (error) {
+    console.error("Gagal melakukan sinkronisasi ke server pusat:", error);
+  }
+}
 
-let products = JSON.parse(localStorage.getItem('gudang_data_foto')) || initialInventory;
-let tools = JSON.parse(localStorage.getItem('gudang_peralatan')) || initialPeralatan;
-let listRak = JSON.parse(localStorage.getItem('gudang_list_rak')) || initialRacks;
-let listKategoriAlat = JSON.parse(localStorage.getItem('gudang_kategori_alat')) || initialCategories;
-
-let logs = JSON.parse(localStorage.getItem('gudang_logs')) || [
-  { teks: "Sistem diinisialisasi berhasil.", waktu: `${new Date().toLocaleDateString('id-ID')} ${new Date().toLocaleTimeString('id-ID')}` }
-];
-
-const channel = new BroadcastChannel('gudang_realtime_total_channel');
+// BroadcastChannel Listener (Untuk menyamakan antar tab internal)
+const channelBawaan = new BroadcastChannel('gudang_realtime_total_channel');
+channelBawaan.onmessage = (event) => {
+  products = event.data.products;
+  logs = event.data.logs;
+  tools = event.data.tools;
+  listRak = event.data.listRak;
+  listKategoriAlat = event.data.listKategoriAlat;
+  renderDropdownRak();
+  renderDropdownKategoriAlat();
+  renderAplikasi();
+  renderPeralatan();
+};
 
 function mainkanSuaraAlarm() {
   const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -124,24 +162,20 @@ function catatAktivitas(teks) {
   if (logs.length > 30) logs.pop(); 
 }
 
-// MENGGAMBAR DROPDOWN RAK & FILTER UNTUK HALAMAN LOGISTIK
 function renderDropdownRak() {
   const inputRakSelect = document.getElementById('inputRak');
   const filterRakSelect = document.getElementById('filterRak');
-  
   if (!inputRakSelect || !filterRakSelect) return;
 
   const cachedInput = inputRakSelect.value;
   const cachedFilter = filterRakSelect.value || 'SEMUA';
 
   inputRakSelect.innerHTML = '';
-  
   listRak.forEach(rak => {
     const opt = document.createElement('option');
     opt.value = rak; opt.innerText = rak;
     inputRakSelect.appendChild(opt);
   });
-
   if (listRak.includes(cachedInput)) inputRakSelect.value = cachedInput;
 
   filterRakSelect.innerHTML = '<option value="SEMUA">✨ Tampilkan Semua Lokasi</option>';
@@ -153,11 +187,9 @@ function renderDropdownRak() {
   filterRakSelect.value = cachedFilter;
 }
 
-// MENGGAMBAR DROPDOWN KATEGORI ALAT & FILTER (DENGAN RE-RENDER BERSIH)
 function renderDropdownKategoriAlat() {
   const inputKategori = document.getElementById('inputKategoriAlat');
   const filterKategori = document.getElementById('filterKategoriAlat');
-
   if (!inputKategori || !filterKategori) return;
 
   const cachedInput = inputKategori.value;
@@ -205,7 +237,6 @@ function dapatkanBadgeCountdown(tanggalTarget) {
   `;
 }
 
-// RENDER MONITORING LOGISTIK KARTU
 function renderAplikasi() {
   if (!isLoggedIn) return; 
 
@@ -308,7 +339,6 @@ function renderAplikasi() {
   });
 }
 
-// RENDER DATA PERALATAN (TRIPLE FILTER + DETAIL POSISI STRING + EDIT LANTAI & KATEGORI)
 function renderPeralatan() {
   const tabelAlat = document.getElementById('tabelPeralatanBodi');
   if (!tabelAlat) return;
@@ -356,30 +386,6 @@ function renderPeralatan() {
   });
 }
 
-function simpanDanSiarkan() {
-  localStorage.setItem('gudang_data_foto', JSON.stringify(products));
-  localStorage.setItem('gudang_peralatan', JSON.stringify(tools));
-  localStorage.setItem('gudang_logs', JSON.stringify(logs));
-  localStorage.setItem('gudang_list_rak', JSON.stringify(listRak));
-  localStorage.setItem('gudang_kategori_alat', JSON.stringify(listKategoriAlat));
-  renderAplikasi();
-  renderPeralatan();
-  channel.postMessage({ products, tools, logs, listRak, listKategoriAlat });
-}
-
-channel.onmessage = (event) => {
-  products = event.data.products;
-  logs = event.data.logs;
-  if (event.data.tools) tools = event.data.tools;
-  if (event.data.listRak) listRak = event.data.listRak;
-  if (event.data.listKategoriAlat) listKategoriAlat = event.data.listKategoriAlat;
-  renderDropdownRak();
-  renderDropdownKategoriAlat();
-  renderAplikasi();
-  renderPeralatan();
-};
-
-// Pasang Event Change pada Komponen Filter
 if (document.getElementById('filterRak')) document.getElementById('filterRak').addEventListener('change', renderAplikasi);
 if (document.getElementById('filterKategoriAlat')) document.getElementById('filterKategoriAlat').addEventListener('change', renderPeralatan);
 if (document.getElementById('filterKondisiAlat')) document.getElementById('filterKondisiAlat').addEventListener('change', renderPeralatan);
@@ -437,22 +443,16 @@ if (document.getElementById('btnKelolaKategoriAlat')) {
       const targetHapus = prompt(daftarTeks);
       if (targetHapus && listKategoriAlat.includes(targetHapus.trim())) {
         const kategoriBersih = targetHapus.trim();
-        
         listKategoriAlat = listKategoriAlat.filter(k => k !== kategoriBersih);
         
         tools = tools.map(alat => {
-          if (alat.kategori === kategoriBersih) {
-            return { ...alat, kategori: 'Lainnya' };
-          }
+          if (alat.kategori === kategoriBersih) return { ...alat, kategori: 'Lainnya' };
           return alat;
         });
 
         catatAktivitas(`Menghapus kategori alat: "${kategoriBersih}"`);
-        
         simpanDanSiarkan();
         renderDropdownKategoriAlat(); 
-      } else if (targetHapus) {
-        alert("⚠️ Nama kategori tidak cocok! Penulisan harus sama persis.");
       }
     }
   });
@@ -465,7 +465,7 @@ document.getElementById('checkInputMassal').addEventListener('change', (e) => {
   else { wrapperBiasa.classList.remove('hidden'); wrapperMassal.classList.add('hidden'); }
 });
 
-// SUBMIT FORM DATA KARTU LOGISTIK (TETAP PAKAI DROPDOWN RAK)
+// SUBMIT FORM DATA KARTU LOGISTIK 
 document.getElementById('formBarang').addEventListener('submit', (e) => {
   e.preventDefault();
   const nama = document.getElementById('inputNama').value;
@@ -506,7 +506,7 @@ document.getElementById('formBarang').addEventListener('submit', (e) => {
   }
 });
 
-// SUBMIT FORM DATA PERALATAN BARU (DETAIL POSISI STRING)
+// SUBMIT FORM DATA PERALATAN BARU
 document.getElementById('formPeralatan').addEventListener('submit', (e) => {
   e.preventDefault();
   const nama = document.getElementById('inputNamaAlat').value;
@@ -572,7 +572,6 @@ document.getElementById('tabelBodi').addEventListener('click', (e) => {
 
 // EVENT CLICK TABLE PERALATAN (MENDUKUNG HAPUS DATA, EDIT LANTAI, & EDIT KATEGORI)
 document.getElementById('tabelPeralatanBodi').addEventListener('click', (e) => {
-  // 1. Logika untuk tombol Hapus Alat
   const tombolHapus = e.target.closest('.btn-hapus-alat');
   if (tombolHapus) {
     const id = tombolHapus.getAttribute('data-id');
@@ -587,7 +586,6 @@ document.getElementById('tabelPeralatanBodi').addEventListener('click', (e) => {
     return;
   }
 
-  // 2. Logika untuk tombol Edit Lantai Alat (✏️)
   const tombolEditLantai = e.target.closest('.btn-edit-lantai');
   if (tombolEditLantai) {
     const id = tombolEditLantai.getAttribute('data-id');
@@ -609,13 +607,10 @@ document.getElementById('tabelPeralatanBodi').addEventListener('click', (e) => {
       alatTerpilih.lantai = 'Lantai 2';
       catatAktivitas(`🛠️ Memindahkan "${alatTerpilih.nama}" ke Lantai 2`);
       simpanDanSiarkan();
-    } else if (menuPrompt !== null) {
-      alert("⚠️ Pilihan tidak valid! Harap ketik angka 1 atau 2.");
     }
     return;
   }
 
-  // 3. Logika untuk tombol Edit Kategori Alat (✏️)
   const tombolEditKategori = e.target.closest('.btn-edit-kategori');
   if (tombolEditKategori) {
     const id = tombolEditKategori.getAttribute('data-id');
@@ -623,33 +618,25 @@ document.getElementById('tabelPeralatanBodi').addEventListener('click', (e) => {
     if (!alatTerpilih) return;
 
     let promptTeks = `⚙️ UBAH KATEGORI PERALATAN\n\nAlat: "${alatTerpilih.nama}"\nKategori Saat Ini: ${alatTerpilih.kategori}\n\nKetik nomor kategori tujuan:\n`;
-    listKategoriAlat.forEach((kat, idx) => {
-      promptTeks += `${idx + 1}. ${kat}\n`;
-    });
+    listKategoriAlat.forEach((kat, idx) => { promptTeks += `${idx + 1}. ${kat}\n`; });
 
     const pilihanIdx = prompt(promptTeks);
     if (pilihanIdx !== null) {
       const nomorUbah = parseInt(pilihanIdx.trim()) - 1;
-      
       if (nomorUbah >= 0 && nomorUbah < listKategoriAlat.length) {
         const kategoriBaru = listKategoriAlat[nomorUbah];
-        if (alatTerpilih.kategori === kategoriBaru) {
-          alert(`Peralatan memang sudah masuk dalam kategori "${kategoriBaru}".`);
-          return;
-        }
+        if (alatTerpilih.kategori === kategoriBaru) return;
         const kategoriLama = alatTerpilih.kategori;
         alatTerpilih.kategori = kategoriBaru;
         catatAktivitas(`🛠️ Mengubah kategori "${alatTerpilih.nama}" dari "${kategoriLama}" ke "${kategoriBaru}"`);
         simpanDanSiarkan();
-      } else {
-        alert("⚠️ Nomor yang Anda masukkan salah atau tidak ada dalam daftar!");
       }
     }
   }
 });
 
 document.getElementById('btnBersihkanLog').addEventListener('click', () => {
-  if (prompt("🔐 Masukkan password admin:") === "gesnt123") {
+  if (prompt("🔐 Masukkan password admin:") === "gudang123") {
     logs = [{ teks: "Log dibersihkan oleh Admin Utama.", waktu: `${new Date().toLocaleDateString('id-ID')} ${new Date().toLocaleTimeString('id-ID')}` }];
     simpanDanSiarkan();
   }
@@ -671,12 +658,12 @@ document.getElementById('btnDownloadExcel').addEventListener('click', () => {
   XLSX.writeFile(bukuKerja, `Log_Gudang_${new Date().toISOString().slice(0,10)}.xlsx`);
 });
 
-// COUNTDOWN TIMER (INTERVAL REAL-TIME RE-RENDER)
+// INTERVAL AUTOMATIC RE-RENDER (COUNTDOWN MONITORING)
 setInterval(() => {
   if (isLoggedIn) {
     renderAplikasi();
   }
 }, 1000);
 
-
+// RUN-FIRST ENGINE
 aturVisibilitasHalaman();
