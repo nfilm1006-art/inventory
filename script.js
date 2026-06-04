@@ -12,7 +12,7 @@ function aturVisibilitasHalaman() {
     if (loginScreen) loginScreen.classList.add("hidden");
     if (mainScreen) mainScreen.classList.remove("hidden");
     
-    // Tarik data dari server.js terlebih dahulu sebelum rendering UI
+    // Ambil data segar dari server database sebelum menggambar komponen UI
     muatDataDariServer();
   } else {
     if (loginScreen) loginScreen.classList.remove("hidden");
@@ -72,7 +72,7 @@ if (tabLogistik && tabPeralatan) {
 // ==================== SEKTOR 2: MANAGEMENT LOGISTIK & PERALATAN (API SERVER) ====================
 const placeholderImg = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><rect width='18' height='18' x='3' y='3' rx='2' ry='2'/><circle cx='9' cy='9' r='2'/><path d='m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21'/></svg>";
 
-// Variabel utama (Sekarang datanya dikendalikan dari server backend database.json)
+// Variabel Kontrol Utama (Data ditarik secara dinamis dari backend database.json)
 let products = [];
 let tools = [];
 let listRak = [];
@@ -92,7 +92,7 @@ async function muatDataDariServer() {
     listKategoriAlat = data.listKategoriAlat || [];
     logs = data.logs || [];
     
-    // Setelah data ditarik, gambar komponen UI
+    // Muat data ke komponen dropdown & Render data ke layar
     renderDropdownRak();
     renderDropdownKategoriAlat();
     renderAplikasi();
@@ -102,24 +102,24 @@ async function muatDataDariServer() {
   }
 }
 
-// FUNGSI API 2: SIMPAN DATA UTUH KE SERVER.JS (MENGGANTIKAN LOCALSTORAGE)
+// FUNGSI API 2: SIMPAN DATA UTUH KE SERVER.JS
 async function simpanDanSiarkan() {
   const dataGudang = { products, tools, listRak, listKategoriAlat, logs };
   
   try {
-    // 1. Simpan permanen ke server database.json
+    // 1. Dorong data ke server lokal untuk ditulis permanen ke database.json
     const response = await fetch('/api/gudang', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(dataGudang)
     });
-    const hasil = await response.json();
+    await response.json();
     
-    // 2. Render perubahan visual di web saat ini
+    // 2. Render ulang tampilan web agar data langsung tampil terbaru
     renderAplikasi();
     renderPeralatan();
     
-    // 3. Sinkronkan tab lain jika terbuka di browser yang sama
+    // 3. Sinkronisasi multi-tab browser perangkat yang sama secara real-time
     const channel = new BroadcastChannel('gudang_realtime_total_channel');
     channel.postMessage(dataGudang);
   } catch (error) {
@@ -127,7 +127,7 @@ async function simpanDanSiarkan() {
   }
 }
 
-// BroadcastChannel Listener (Untuk menyamakan antar tab internal)
+// BroadcastChannel Listener (Menyamakan data antar tab browser yang sama)
 const channelBawaan = new BroadcastChannel('gudang_realtime_total_channel');
 channelBawaan.onmessage = (event) => {
   products = event.data.products;
@@ -391,7 +391,7 @@ if (document.getElementById('filterKategoriAlat')) document.getElementById('filt
 if (document.getElementById('filterKondisiAlat')) document.getElementById('filterKondisiAlat').addEventListener('change', renderPeralatan);
 if (document.getElementById('filterLantaiAlat')) document.getElementById('filterLantaiAlat').addEventListener('change', renderPeralatan);
 
-// KELOLA DROPDOWN RAK LOGISTIK
+// MANAGEMENT DROPDOWN RAK LOGISTIK (PROMPT DIALOG)
 if (document.getElementById('btnKelolaRak')) {
   document.getElementById('btnKelolaRak').addEventListener('click', () => {
     const menuOpsi = prompt("⚙️ PENGATURAN DROPDOWN LOKASI RAK (LOGISTIK)\n\nKetik '1' : TAMBAH Rak Baru\nKetik '2' : HAPUS Rak");
@@ -420,7 +420,7 @@ if (document.getElementById('btnKelolaRak')) {
   });
 }
 
-// KELOLA PILIHAN KATEGORI ALAT
+// MANAGEMENT DROPDOWN KATEGORI ALAT (PROMPT DIALOG)
 if (document.getElementById('btnKelolaKategoriAlat')) {
   document.getElementById('btnKelolaKategoriAlat').addEventListener('click', () => {
     const menuOpsi = prompt("⚙️ KELOLA PILIHAN KATEGORI PERALATAN\n\nKetik '1' : TAMBAH Kategori Baru\nKetik '2' : HAPUS Kategori");
@@ -465,8 +465,8 @@ document.getElementById('checkInputMassal').addEventListener('change', (e) => {
   else { wrapperBiasa.classList.remove('hidden'); wrapperMassal.classList.add('hidden'); }
 });
 
-// SUBMIT FORM DATA KARTU LOGISTIK 
-document.getElementById('formBarang').addEventListener('submit', (e) => {
+// SUBMIT DATA FORM LOGISTIK BARU (FIXED ASYNC INTERACTION)
+document.getElementById('formBarang').addEventListener('submit', async (e) => {
   e.preventDefault();
   const nama = document.getElementById('inputNama').value;
   const rak = document.getElementById('inputRak').value; 
@@ -477,7 +477,7 @@ document.getElementById('formBarang').addEventListener('submit', (e) => {
 
   if (!nama || nama.trim() === "") return;
 
-  const eksekusiSimpan = (fotoUrl) => {
+  const eksekusiSimpan = async (fotoUrl) => {
     if (isMassal) {
       const jumlahKartu = Number(document.getElementById('inputJumlahMassal').value) || 1;
       for (let i = 1; i <= jumlahKartu; i++) {
@@ -491,7 +491,10 @@ document.getElementById('formBarang').addEventListener('submit', (e) => {
       catatAktivitas(`Menambahkan item baru "${nama}"`);
       if (stok <= minimalStok) mainkanSuaraAlarm();
     }
-    simpanDanSiarkan();
+    
+    // SINKRONISASI KE SERVER TERLEBIH DAHULU SEBELUM FORM DI-RESET
+    await simpanDanSiarkan();
+    
     e.target.reset();
     document.getElementById('wrapperStokBiasa').classList.remove('hidden');
     document.getElementById('wrapperJumlahMassal').classList.add('hidden');
@@ -499,15 +502,15 @@ document.getElementById('formBarang').addEventListener('submit', (e) => {
 
   if (fileFoto) {
     const reader = new FileReader();
-    reader.onload = function(event) { eksekusiSimpan(event.target.result); };
+    reader.onload = async function(event) { await eksekusiSimpan(event.target.result); };
     reader.readAsDataURL(fileFoto);
   } else {
-    eksekusiSimpan(placeholderImg);
+    await eksekusiSimpan(placeholderImg);
   }
 });
 
-// SUBMIT FORM DATA PERALATAN BARU
-document.getElementById('formPeralatan').addEventListener('submit', (e) => {
+// SUBMIT DATA FORM PERALATAN BARU (FIXED ASYNC INTERACTION)
+document.getElementById('formPeralatan').addEventListener('submit', async (e) => {
   e.preventDefault();
   const nama = document.getElementById('inputNamaAlat').value;
   const kategori = document.getElementById('inputKategoriAlat').value;
@@ -519,18 +522,21 @@ document.getElementById('formPeralatan').addEventListener('submit', (e) => {
   const alatBaru = { id: 'alat-' + Date.now(), nama, kategori, stok, kondisi, lantai, rak };
   tools.push(alatBaru);
   catatAktivitas(`🛠️ Menambahkan alat baru "${nama}" (${stok} Unit) di [${lantai} - ${rak}]`);
-  simpanDanSiarkan();
+  
+  // KUNCI LANGSUNG KE FILE DATABASE.JSON SERVER
+  await simpanDanSiarkan();
+  
   e.target.reset();
 });
 
-// EVENT CLICK TABLE LOGISTIK
+// EVENT AKSI TABEL LOGISTIK (TAMBAH, KURANG, ALASAN STOK, HAPUS)
 document.getElementById('tabelBodi').addEventListener('click', (e) => {
   const tombol = e.target.closest('button');
   if (!tombol) return;
   const aksi = tombol.getAttribute('data-aksi');
   const id = tombol.getAttribute('data-id');
   const itemTerpilih = products.find(p => p.id === id);
-  if (!itemTerpilih) return;
+  if (!itemTerpilled) return;
 
   if (aksi === 'hapus') {
     if (confirm(`Hapus "${itemTerpilih.nama}"?`)) {
@@ -570,7 +576,7 @@ document.getElementById('tabelBodi').addEventListener('click', (e) => {
   simpanDanSiarkan();
 });
 
-// EVENT CLICK TABLE PERALATAN (MENDUKUNG HAPUS DATA, EDIT LANTAI, & EDIT KATEGORI)
+// EVENT AKSI TABEL PERALATAN (EDIT PENSIL LANTAI & EDIT PENSIL KATEGORI)
 document.getElementById('tabelPeralatanBodi').addEventListener('click', (e) => {
   const tombolHapus = e.target.closest('.btn-hapus-alat');
   if (tombolHapus) {
@@ -636,9 +642,11 @@ document.getElementById('tabelPeralatanBodi').addEventListener('click', (e) => {
 });
 
 document.getElementById('btnBersihkanLog').addEventListener('click', () => {
-  if (prompt("🔐 Masukkan password admin:") === "gudang123") {
+  if (prompt("🔐 Masukkan password admin:") === ADMIN_PASSWORD) {
     logs = [{ teks: "Log dibersihkan oleh Admin Utama.", waktu: `${new Date().toLocaleDateString('id-ID')} ${new Date().toLocaleTimeString('id-ID')}` }];
     simpanDanSiarkan();
+  } else {
+    alert("❌ Password Salah!");
   }
 });
 
@@ -658,12 +666,12 @@ document.getElementById('btnDownloadExcel').addEventListener('click', () => {
   XLSX.writeFile(bukuKerja, `Log_Gudang_${new Date().toISOString().slice(0,10)}.xlsx`);
 });
 
-// INTERVAL AUTOMATIC RE-RENDER (COUNTDOWN MONITORING)
+// MONITORING COUNTDOWN KADALUARSA TIAP 1 DETIK
 setInterval(() => {
   if (isLoggedIn) {
     renderAplikasi();
   }
 }, 1000);
 
-// RUN-FIRST ENGINE
+// INISIALISASI MESIN UTAMA SAAT PERTAMA KALI DIBUKA
 aturVisibilitasHalaman();
