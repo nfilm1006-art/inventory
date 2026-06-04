@@ -1,6 +1,11 @@
-// ==================== SEKTOR 1: AUTHENTICATION (LOGIN SYSTEMS) ====================
+// ==========================================================================
+// SEKTOR 1: AUTHENTICATION, CONFIG & ROUTING
+// ==========================================================================
 const ADMIN_USERNAME = "Admin";
 const ADMIN_PASSWORD = "gesnt123";
+
+// URL Database Baru untuk project Gesnt Abang (Otomatis membuat berkas gudang.json)
+const FIREBASE_DB_URL = "https://gesnt-f5eb1-default-rtdb.asia-southeast1.firebasedatabase.app/gudang.json";
 
 let isLoggedIn = localStorage.getItem("gudang_session") === "true";
 
@@ -12,7 +17,7 @@ function aturVisibilitasHalaman() {
     if (loginScreen) loginScreen.classList.add("hidden");
     if (mainScreen) mainScreen.classList.remove("hidden");
     
-    // Ambil data segar dari server database sebelum menggambar komponen UI
+    // Ambil data terbaru dari Cloud Firebase begitu berhasil masuk
     muatDataDariServer();
   } else {
     if (loginScreen) loginScreen.classList.remove("hidden");
@@ -20,658 +25,554 @@ function aturVisibilitasHalaman() {
   }
 }
 
-document.getElementById("formLogin").addEventListener("submit", (e) => {
-  e.preventDefault();
-  const user = document.getElementById("loginUsername").value;
-  const pass = document.getElementById("loginPassword").value;
-  const errMsg = document.getElementById("errorLogin");
+// Handle Form Login
+const loginForm = document.getElementById("loginForm");
+if (loginForm) {
+  loginForm.addEventListener("submit", function (e) {
+    e.preventDefault();
+    const userIn = document.getElementById("username").value;
+    const passIn = document.getElementById("password").value;
 
-  if (user === ADMIN_USERNAME && pass === ADMIN_PASSWORD) {
-    isLoggedIn = true;
-    localStorage.setItem("gudang_session", "true");
-    if (errMsg) errMsg.classList.add("hidden");
-    e.target.reset();
-    aturVisibilitasHalaman();
-  } else {
-    if (errMsg) errMsg.classList.remove("hidden");
-  }
-});
-
-document.getElementById("btnLogout").addEventListener("click", () => {
-  if (confirm("Apakah Anda ingin keluar dari sistem logistik?")) {
-    isLoggedIn = false;
-    localStorage.removeItem("gudang_session");
-    aturVisibilitasHalaman();
-  }
-});
-
-
-// ==================== ENGINE NAVIGASI SWITCH TAB (SPA SEKTOR) ====================
-const tabLogistik = document.getElementById('tabLogistik');
-const tabPeralatan = document.getElementById('tabPeralatan');
-const halLogistik = document.getElementById('halamanLogistik');
-const halPeralatan = document.getElementById('halamanPeralatan');
-
-if (tabLogistik && tabPeralatan) {
-  tabLogistik.addEventListener('click', () => {
-    halLogistik.classList.remove('hidden');
-    halPeralatan.classList.add('hidden');
-    tabLogistik.className = "px-4 py-2 text-sm font-semibold rounded-lg bg-emerald-600 text-white shadow transition-all";
-    tabPeralatan.className = "px-4 py-2 text-sm font-semibold rounded-lg bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-white transition-all";
-  });
-
-  tabPeralatan.addEventListener('click', () => {
-    halLogistik.classList.add('hidden');
-    halPeralatan.classList.remove('hidden');
-    tabLogistik.className = "px-4 py-2 text-sm font-semibold rounded-lg bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-white transition-all";
-    tabPeralatan.className = "px-4 py-2 text-sm font-semibold rounded-lg bg-cyan-600 text-white shadow transition-all";
+    if (userIn === ADMIN_USERNAME && passIn === ADMIN_PASSWORD) {
+      isLoggedIn = true;
+      localStorage.setItem("gudang_session", "true");
+      aturVisibilitasHalaman();
+      tampilkanNotifikasi("Selamat datang, Admin!", "success");
+    } else {
+      tampilkanNotifikasi("Username atau Password salah!", "error");
+    }
   });
 }
 
+// Log Out
+function logout() {
+  isLoggedIn = false;
+  localStorage.removeItem("gudang_session");
+  aturVisibilitasHalaman();
+  tampilkanNotifikasi("Berhasil keluar sistem.", "info");
+}
 
-// ==================== SEKTOR 2: MANAGEMENT LOGISTIK & PERALATAN (API SERVER) ====================
+// Navigasi Tab Dashboard Utama
+function gantiTab(tabId) {
+  const semuaTab = ["tabDashboard", "tabBarang", "tabAlat", "tabPengaturan", "tabLog"];
+  semuaTab.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.classList.add("hidden");
+  });
+
+  const tabAktif = document.getElementById(tabId);
+  if (tabAktif) tabAktif.classList.remove("hidden");
+
+  // Atur styling tombol navigasi yang aktif
+  const semuaTombol = document.querySelectorAll(".nav-btn");
+  semuaTombol.forEach(btn => btn.classList.remove("bg-emerald-700", "text-white"));
+  
+  const btnAktif = document.getElementById("btn-" + tabId);
+  if (btnAktif) btnAktif.classList.add("bg-emerald-700", "text-white");
+}
+
+
+// ==========================================================================
+// SEKTOR 2: AMBIL & SIMPAN DATA (CLOUD FIREBASE REST API)
+// ==========================================================================
 const placeholderImg = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><rect width='18' height='18' x='3' y='3' rx='2' ry='2'/><circle cx='9' cy='9' r='2'/><path d='m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21'/></svg>";
 
-// Variabel Kontrol Utama (Data ditarik secara dinamis dari backend database.json)
 let products = [];
 let tools = [];
-let listRak = [];
-let listKategoriAlat = [];
+let listRak = ["RAK A-1 Depo", "Rak B-2 501", "Gudang Utama"];
+let listKategoriAlat = ["Alat Kerja", "Perangkat IT"];
 let logs = [];
 
-// FUNGSI API 1: AMBIL DATA DARI SERVER.JS
+// Memuat data dari server Firebase Cloud
 async function muatDataDariServer() {
   try {
-    const response = await fetch('/api/gudang');
-    if (!response.ok) throw new Error("Gagal merespon server.");
+    const response = await fetch(FIREBASE_DB_URL);
+    if (!response.ok) throw new Error("Gagal mengambil data cloud.");
     const data = await response.json();
     
-    products = data.products || [];
-    tools = data.tools || [];
-    listRak = data.listRak || [];
-    listKategoriAlat = data.listKategoriAlat || [];
-    logs = data.logs || [];
+    if (data) {
+      products = data.products || [];
+      tools = data.tools || [];
+      listRak = data.listRak || ["RAK A-1 Depo", "Rak B-2 501", "Gudang Utama"];
+      listKategoriAlat = data.listKategoriAlat || ["Alat Kerja", "Perangkat IT"];
+      logs = data.logs || [];
+    }
     
-    // Muat data ke komponen dropdown & Render data ke layar
-    renderDropdownRak();
-    renderDropdownKategoriAlat();
-    renderAplikasi();
-    renderPeralatan();
+    refreshSemuaKomponenUI();
   } catch (error) {
-    console.error("Error mengambil data server:", error);
+    console.error("⚠️ Masalah sinkronisasi Firebase:", error);
+    tampilkanNotifikasi("Gagal memuat data dari cloud. Berjalan dalam mode lokal.", "error");
   }
 }
 
-// FUNGSI API 2: SIMPAN DATA UTUH KE SERVER.JS
+// Menyimpan data secara permanen ke server Firebase Cloud
 async function simpanDanSiarkan() {
   const dataGudang = { products, tools, listRak, listKategoriAlat, logs };
   
+  // Render UI lokal terlebih dahulu agar aplikasi terasa instan tanpa delay
+  refreshSemuaKomponenUI();
+
   try {
-    // 1. Dorong data ke server lokal untuk ditulis permanen ke database.json
-    const response = await fetch('/api/gudang', {
-      method: 'POST',
+    await fetch(FIREBASE_DB_URL, {
+      method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(dataGudang)
     });
-    await response.json();
-    
-    // 2. Render ulang tampilan web agar data langsung tampil terbaru
-    renderAplikasi();
-    renderPeralatan();
-    
-    // 3. Sinkronisasi multi-tab browser perangkat yang sama secara real-time
-    const channel = new BroadcastChannel('gudang_realtime_total_channel');
-    channel.postMessage(dataGudang);
   } catch (error) {
-    console.error("Gagal melakukan sinkronisasi ke server pusat:", error);
+    console.error("❌ Sinkronisasi Cloud Gagal:", error);
+    tampilkanNotifikasi("Gagal mencadangkan ke cloud. Periksa internet Anda.", "error");
   }
 }
 
-// BroadcastChannel Listener (Menyamakan data antar tab browser yang sama)
-const channelBawaan = new BroadcastChannel('gudang_realtime_total_channel');
-channelBawaan.onmessage = (event) => {
-  products = event.data.products;
-  logs = event.data.logs;
-  tools = event.data.tools;
-  listRak = event.data.listRak;
-  listKategoriAlat = event.data.listKategoriAlat;
-  renderDropdownRak();
-  renderDropdownKategoriAlat();
-  renderAplikasi();
-  renderPeralatan();
-};
-
-function mainkanSuaraAlarm() {
-  const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-  const oscillator = audioCtx.createOscillator();
-  const gainNode = audioCtx.createGain();
-  oscillator.type = 'sine';
-  oscillator.frequency.setValueAtTime(880, audioCtx.currentTime);
-  gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime); 
-  oscillator.connect(gainNode);
-  gainNode.connect(audioCtx.destination);
-  oscillator.start();
-  oscillator.stop(audioCtx.currentTime + 0.15);
+function refreshSemuaKomponenUI() {
+  renderDashboard();
+  renderTabelBarang();
+  renderTabelAlat();
+  renderOpsiPengaturan();
+  renderRiwayatLog();
 }
 
-function catatAktivitas(teks) {
-  const tgl = new Date().toLocaleDateString('id-ID');
-  const jam = new Date().toLocaleTimeString('id-ID');
-  const logBaru = { teks: teks, waktu: `${tgl} ${jam}` };
-  logs.unshift(logBaru); 
-  if (logs.length > 30) logs.pop(); 
-}
 
-function renderDropdownRak() {
-  const inputRakSelect = document.getElementById('inputRak');
-  const filterRakSelect = document.getElementById('filterRak');
-  if (!inputRakSelect || !filterRakSelect) return;
+// ==========================================================================
+// SEKTOR 3: MANAJEMEN BARANG (STOK & KEUANGAN)
+// ==========================================================================
+function renderTabelBarang() {
+  const tbody = document.getElementById("tbodyBarang");
+  if (!tbody) return;
+  tbody.innerHTML = "";
 
-  const cachedInput = inputRakSelect.value;
-  const cachedFilter = filterRakSelect.value || 'SEMUA';
+  products.forEach((p, index) => {
+    const totalHargaBeli = p.stok * p.hargaBeli;
+    const totalHargaJual = p.stok * p.hargaJual;
+    const estimasiProfit = totalHargaJual - totalHargaBeli;
 
-  inputRakSelect.innerHTML = '';
-  listRak.forEach(rak => {
-    const opt = document.createElement('option');
-    opt.value = rak; opt.innerText = rak;
-    inputRakSelect.appendChild(opt);
-  });
-  if (listRak.includes(cachedInput)) inputRakSelect.value = cachedInput;
-
-  filterRakSelect.innerHTML = '<option value="SEMUA">✨ Tampilkan Semua Lokasi</option>';
-  listRak.forEach(rak => {
-    const opt = document.createElement('option');
-    opt.value = rak; opt.innerText = rak;
-    filterRakSelect.appendChild(opt);
-  });
-  filterRakSelect.value = cachedFilter;
-}
-
-function renderDropdownKategoriAlat() {
-  const inputKategori = document.getElementById('inputKategoriAlat');
-  const filterKategori = document.getElementById('filterKategoriAlat');
-  if (!inputKategori || !filterKategori) return;
-
-  const cachedInput = inputKategori.value;
-  const cachedFilter = filterKategori.value || 'SEMUA';
-
-  inputKategori.innerHTML = '';
-  filterKategori.innerHTML = '<option value="SEMUA">✨ Semua Kategori</option>';
-
-  listKategoriAlat.forEach(kat => {
-    const opt = document.createElement('option');
-    opt.value = kat; opt.innerText = kat;
-    inputKategori.appendChild(opt);
-  });
-  if (listKategoriAlat.includes(cachedInput)) inputKategori.value = cachedInput;
-
-  listKategoriAlat.forEach(kat => {
-    const opt = document.createElement('option');
-    opt.value = kat; opt.innerText = kat;
-    filterKategori.appendChild(opt);
-  });
-  filterKategori.value = cachedFilter;
-}
-
-function dapatkanBadgeCountdown(tanggalTarget) {
-  if (!tanggalTarget) return `<span class="text-slate-500 italic text-xs">-</span>`;
-  const targetTime = new Date(tanggalTarget + "T23:59:59").getTime();
-  const sekarang = new Date().getTime();
-  const selisih = targetTime - sekarang;
-
-  if (selisih <= 0) {
-    return `<span class="bg-red-500/20 text-red-400 border border-red-500/30 px-2 py-1 rounded font-bold text-[11px] block text-center animate-pulse">❌ KADALUARSA</span>`;
-  }
-  const hari = Math.floor(selisih / (1000 * 60 * 60 * 24));
-  const jam = Math.floor((selisih % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-
-  let warnaKelas = "bg-slate-900 border-slate-700 text-emerald-400";
-  if (hari <= 3) warnaKelas = "bg-red-950/40 border-red-500/40 text-red-400";
-  else if (hari <= 7) warnaKelas = "bg-amber-950/40 border-amber-500/40 text-amber-400";
-
-  return `
-    <div class="text-center">
-      <span class="font-mono ${warnaKelas} border px-2 py-0.5 rounded text-[11px] font-bold block shadow-sm">${hari}h ${jam}j Sisa</span>
-      <span class="text-[10px] text-slate-500 block mt-0.5 font-mono">${tanggalTarget}</span>
-    </div>
-  `;
-}
-
-function renderAplikasi() {
-  if (!isLoggedIn) return; 
-
-  const tabelBodi = document.getElementById('tabelBodi');
-  const kontainerNotifikasi = document.getElementById('kontainerNotifikasi');
-  const badgeAlert = document.getElementById('badgeAlert');
-  const kontainerLog = document.getElementById('kontainerLog');
-  const filterRak = document.getElementById('filterRak');
-  
-  if (!tabelBodi) return; 
-  
-  tabelBodi.innerHTML = '';
-  if (kontainerNotifikasi) kontainerNotifikasi.innerHTML = '';
-  if (kontainerLog) kontainerLog.innerHTML = '';
-  let jumlahAlert = 0;
-
-  const lokasiDipilih = filterRak ? filterRak.value : 'SEMUA';
-  
-  products.forEach(item => {
-    if (lokasiDipilih !== 'SEMUA' && item.rak !== lokasiDipilih) return; 
-
-    const isKritis = Number(item.stok) <= Number(item.minimalStok);
-    let statusMasaAktifKritis = false;
-    let pesanKritisMasaAktif = "";
-
-    const cekMasaAktif = (tgl, tipe) => {
-      if (!tgl) return;
-      const selisih = new Date(tgl + "T23:59:59").getTime() - new Date().getTime();
-      if (selisih <= 0) { statusMasaAktifKritis = true; pesanKritisMasaAktif += `❌ ${tipe} ${item.nama} Habis! `; }
-      else if (selisih / (1000 * 60 * 60 * 24) <= 7) { statusMasaAktifKritis = true; pesanKritisMasaAktif += `⏳ ${tipe} ${item.nama} sisa < 7 hari. `; }
-    };
-
-    cekMasaAktif(item.aktifKartu, "Masa Kartu");
-    cekMasaAktif(item.aktifKuota, "Masa Kuota");
-
-    const tr = document.createElement('tr');
-    tr.className = 'hover:bg-slate-750 transition-colors border-b border-slate-700/50';
+    const tr = document.createElement("tr");
+    tr.className = "border-b hover:bg-slate-50 text-sm text-slate-700";
     tr.innerHTML = `
-      <td class="px-4 py-3 text-left whitespace-nowrap">
-        <img src="${item.foto || placeholderImg}" alt="${item.nama}" class="w-10 h-10 object-cover rounded-lg bg-slate-900 border border-slate-700 shadow-inner" />
+      <td class="p-3 text-center">${index + 1}</td>
+      <td class="p-3">
+        <img src="${p.foto || placeholderImg}" class="w-12 h-12 object-cover rounded border bg-white mx-auto">
       </td>
-      <td class="px-4 py-3 font-medium text-white text-left break-words">${item.nama}</td>
-      <td class="px-4 py-3 text-center whitespace-nowrap">
-        <span class="font-mono bg-slate-900 px-2 py-0.5 rounded text-slate-400 text-[11px] border border-slate-700/50">${item.rak}</span>
-      </td>
-      <td class="px-4 py-3 text-center whitespace-nowrap">
-        <span class="px-2.5 py-0.5 rounded-full font-bold text-[11px] inline-block ${isKritis ? 'bg-red-500/20 text-red-400 border border-red-500/30' : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'}">${item.stok} Pcs</span>
-      </td>
-      <td class="px-4 py-3 text-center text-slate-400 font-medium whitespace-nowrap text-xs">${item.minimalStok} Pcs</td>
-      <td class="px-4 py-3 text-center whitespace-nowrap">${dapatkanBadgeCountdown(item.aktifKartu)}</td>
-      <td class="px-4 py-3 text-center whitespace-nowrap">${dapatkanBadgeCountdown(item.aktifKuota)}</td>
-      <td class="px-4 py-3 text-center whitespace-nowrap">
+      <td class="p-3 font-semibold text-slate-900">${p.nama}</td>
+      <td class="p-3 text-center"><span class="px-2 py-1 bg-slate-100 rounded text-xs">${p.rak}</span></td>
+      <td class="p-3 text-center font-bold text-emerald-600">${p.stok}</td>
+      <td class="p-3 text-right">Rp ${p.hargaBeli.toLocaleString()}</td>
+      <td class="p-3 text-right">Rp ${p.hargaJual.toLocaleString()}</td>
+      <td class="p-3 text-right text-amber-600 font-medium">Rp ${estimasiProfit.toLocaleString()}</td>
+      <td class="p-3 text-center">
         <div class="flex justify-center gap-1">
-          <button data-id="${item.id}" data-aksi="kurang" class="bg-slate-700 hover:bg-slate-600 text-white text-[11px] px-2 py-0.5 rounded transition font-bold select-none">-1</button>
-          <button data-id="${item.id}" data-aksi="tambah" class="bg-slate-700 hover:bg-slate-600 text-white text-[11px] px-2 py-0.5 rounded transition font-bold select-none">+1</button>
+          <button onclick="ubahStokBarang(${index}, 1)" class="px-2 py-1 bg-emerald-500 hover:bg-emerald-600 text-white rounded text-xs font-bold">+1</button>
+          <button onclick="ubahStokBarang(${index}, -1)" class="px-2 py-1 bg-amber-500 hover:bg-amber-600 text-white rounded text-xs font-bold">-1</button>
+          <button onclick="hapusBarang(${index})" class="px-2 py-1 bg-rose-500 hover:bg-rose-600 text-white rounded text-xs font-bold">Hapus</button>
         </div>
-      </td>
-      <td class="px-4 py-3 text-center whitespace-nowrap">
-        <button data-id="${item.id}" data-aksi="hapus" class="bg-red-600/20 hover:bg-red-600 text-red-400 hover:text-white text-xs px-2 py-1 rounded transition border border-red-500/20 flex items-center justify-center mx-auto select-none">🗑️</button>
       </td>
     `;
-    tabelBodi.appendChild(tr);
-
-    if (isKritis || statusMasaAktifKritis) {
-      jumlahAlert++;
-      let templatePesan = "";
-      if (isKritis) templatePesan += `⚠️ Stok ${item.nama} kritis! Sisa ${item.stok} Pcs. `;
-      if (statusMasaAktifKritis) templatePesan += pesanKritisMasaAktif;
-
-      const alertDiv = document.createElement('div');
-      alertDiv.className = 'bg-red-950/40 border-l-4 border-red-500 p-3 rounded-r-lg border border-y-slate-700 border-r-slate-700 flex gap-3 items-center';
-      alertDiv.innerHTML = `
-        <img src="${item.foto || placeholderImg}" class="w-10 h-10 object-cover rounded bg-slate-900 border border-red-500/20" />
-        <div class="flex-1 min-w-0"><p class="text-xs text-red-200 font-medium break-words">${templatePesan}</p></div>
-      `;
-      if (kontainerNotifikasi) kontainerNotifikasi.appendChild(alertDiv);
-    }
-  });
-
-  tools.forEach(alat => {
-    if (alat.kondisi === "RUSAK BERAT") {
-      jumlahAlert++;
-      const alertDiv = document.createElement('div');
-      alertDiv.className = 'bg-red-950/40 border-l-4 border-amber-500 p-3 rounded-r-lg border border-y-slate-700 border-r-slate-700';
-      alertDiv.innerHTML = `<p class="text-xs text-amber-200 font-medium">🚨 Alat "${alat.nama}" terdata RUSAK BERAT! Harap segera dicek unitnya.</p>`;
-      if (kontainerNotifikasi) kontainerNotifikasi.appendChild(alertDiv);
-    }
-  });
-
-  if (badgeAlert) badgeAlert.innerText = `${jumlahAlert} Terdeteksi`;
-  if (jumlahAlert === 0 && kontainerNotifikasi) {
-    kontainerNotifikasi.innerHTML = `<div class="text-center text-slate-500 pt-10 text-sm"><p>✅ Semua aman terkendali.</p></div>`;
-  }
-
-  logs.forEach(log => {
-    const logDiv = document.createElement('div');
-    logDiv.className = 'flex justify-between items-start py-1 border-b border-slate-700/30 text-slate-300 text-xs';
-    logDiv.innerHTML = `<span>➡️ ${log.teks}</span><span class="text-slate-500 text-[10px]">${log.waktu}</span>`;
-    if (kontainerLog) kontainerLog.appendChild(logDiv);
+    tbody.appendChild(tr);
   });
 }
 
-function renderPeralatan() {
-  const tabelAlat = document.getElementById('tabelPeralatanBodi');
-  if (!tabelAlat) return;
-
-  const filterKategori = document.getElementById('filterKategoriAlat').value || 'SEMUA';
-  const filterKondisi = document.getElementById('filterKondisiAlat').value || 'SEMUA';
-  const filterLantai = document.getElementById('filterLantaiAlat').value || 'SEMUA';
-
-  tabelAlat.innerHTML = '';
-  
-  tools.forEach(alat => {
-    if (filterKategori !== 'SEMUA' && alat.kategori !== filterKategori) return;
-    if (filterKondisi !== 'SEMUA' && alat.kondisi !== filterKondisi) return;
-    if (filterLantai !== 'SEMUA' && (alat.lantai || 'Lantai 1') !== filterLantai) return;
-
-    let badgeKondisi = "";
-    if (alat.kondisi === "BAGUS") badgeKondisi = `<span class="bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[11px] px-2 py-0.5 rounded font-medium">✅ BAGUS</span>`;
-    if (alat.kondisi === "RUSAK RINGAN") badgeKondisi = `<span class="bg-amber-500/20 text-amber-400 border border-amber-500/30 text-[11px] px-2 py-0.5 rounded font-medium">⚠️ RUSAK RINGAN</span>`;
-    if (alat.kondisi === "RUSAK BERAT") badgeKondisi = `<span class="bg-red-500/20 text-red-400 border border-red-500/30 text-[11px] px-2 py-0.5 rounded font-bold animate-pulse">❌ RUSAK BERAT</span>`;
-
-    const tr = document.createElement('tr');
-    tr.className = 'hover:bg-slate-750 transition-colors border-b border-slate-700/50';
-    tr.innerHTML = `
-      <td class="px-4 py-3 text-left font-medium text-white break-words">${alat.nama}</td>
-      <td class="px-4 py-3 text-center whitespace-nowrap">
-        <div class="flex items-center justify-center gap-1.5">
-          <span class="text-slate-400 text-xs">${alat.kategori}</span>
-          <button data-id="${alat.id}" class="btn-edit-kategori text-slate-500 hover:text-cyan-400 transition" title="Ubah Kategori">✏️</button>
-        </div>
-      </td>
-      <td class="px-4 py-3 text-center font-bold text-cyan-400 font-mono">${alat.stok} Unit</td>
-      <td class="px-4 py-3 text-center whitespace-nowrap">${badgeKondisi}</td>
-      <td class="px-4 py-3 text-center whitespace-nowrap">
-        <div class="flex items-center justify-center gap-1.5">
-          <span class="bg-slate-900 px-2 py-0.5 rounded text-cyan-400 border border-slate-700 text-xs font-semibold">${alat.lantai || 'Lantai 1'}</span>
-          <button data-id="${alat.id}" class="btn-edit-lantai text-slate-500 hover:text-cyan-400 transition" title="Ubah Lantai">✏️</button>
-        </div>
-      </td>
-      <td class="px-4 py-3 text-left text-slate-300 text-xs break-words">${alat.rak || 'Belum diatur'}</td>
-      <td class="px-4 py-3 text-center whitespace-nowrap">
-        <button data-id="${alat.id}" class="btn-hapus-alat bg-red-600/20 hover:bg-red-600 text-red-400 hover:text-white text-xs px-2 py-1 rounded transition border border-red-500/20 flex items-center justify-center mx-auto select-none">🗑️</button>
-      </td>
-    `;
-    tabelAlat.appendChild(tr);
-  });
-}
-
-if (document.getElementById('filterRak')) document.getElementById('filterRak').addEventListener('change', renderAplikasi);
-if (document.getElementById('filterKategoriAlat')) document.getElementById('filterKategoriAlat').addEventListener('change', renderPeralatan);
-if (document.getElementById('filterKondisiAlat')) document.getElementById('filterKondisiAlat').addEventListener('change', renderPeralatan);
-if (document.getElementById('filterLantaiAlat')) document.getElementById('filterLantaiAlat').addEventListener('change', renderPeralatan);
-
-// MANAGEMENT DROPDOWN RAK LOGISTIK (PROMPT DIALOG)
-if (document.getElementById('btnKelolaRak')) {
-  document.getElementById('btnKelolaRak').addEventListener('click', () => {
-    const menuOpsi = prompt("⚙️ PENGATURAN DROPDOWN LOKASI RAK (LOGISTIK)\n\nKetik '1' : TAMBAH Rak Baru\nKetik '2' : HAPUS Rak");
-    if (menuOpsi === '1') {
-      const namaRakBaru = prompt("Masukkan nama lokasi rak baru:");
-      if (namaRakBaru && namaRakBaru.trim() !== "") {
-        const namaBersih = namaRakBaru.trim();
-        if (!listRak.includes(namaBersih)) {
-          listRak.push(namaBersih);
-          catatAktivitas(`Menambahkan lokasi rak baru ke pilihan: "${namaBersih}"`);
-          simpanDanSiarkan();
-          renderDropdownRak();
-        }
-      }
-    } else if (menuOpsi === '2') {
-      let daftarTeks = "Ketik nama rak yang ingin dihapus:\n\n";
-      listRak.forEach((r, idx) => { daftarTeks += `${idx + 1}. ${r}\n`; });
-      const targetHapus = prompt(daftarTeks);
-      if (targetHapus && listRak.includes(targetHapus.trim())) {
-        listRak = listRak.filter(r => r !== targetHapus.trim());
-        catatAktivitas(`Menghapus lokasi rak "${targetHapus.trim()}"`);
-        simpanDanSiarkan();
-        renderDropdownRak();
-      }
-    }
-  });
-}
-
-// MANAGEMENT DROPDOWN KATEGORI ALAT (PROMPT DIALOG)
-if (document.getElementById('btnKelolaKategoriAlat')) {
-  document.getElementById('btnKelolaKategoriAlat').addEventListener('click', () => {
-    const menuOpsi = prompt("⚙️ KELOLA PILIHAN KATEGORI PERALATAN\n\nKetik '1' : TAMBAH Kategori Baru\nKetik '2' : HAPUS Kategori");
-    
-    if (menuOpsi === '1') {
-      const namaKatBaru = prompt("Masukkan nama jenis kategori baru:");
-      if (namaKatBaru && namaKatBaru.trim() !== "") {
-        const bersih = namaKatBaru.trim();
-        if (!listKategoriAlat.includes(bersih)) {
-          listKategoriAlat.push(bersih);
-          catatAktivitas(`Menambahkan kategori alat baru: "${bersih}"`);
-          simpanDanSiarkan();
-          renderDropdownKategoriAlat();
-        }
-      }
-    } else if (menuOpsi === '2') {
-      let daftarTeks = "Ketik NAMA KATEGORI persis seperti di bawah untuk menghapus:\n\n";
-      listKategoriAlat.forEach((k, idx) => { daftarTeks += `${idx + 1}. ${k}\n`; });
-      
-      const targetHapus = prompt(daftarTeks);
-      if (targetHapus && listKategoriAlat.includes(targetHapus.trim())) {
-        const kategoriBersih = targetHapus.trim();
-        listKategoriAlat = listKategoriAlat.filter(k => k !== kategoriBersih);
-        
-        tools = tools.map(alat => {
-          if (alat.kategori === kategoriBersih) return { ...alat, kategori: 'Lainnya' };
-          return alat;
-        });
-
-        catatAktivitas(`Menghapus kategori alat: "${kategoriBersih}"`);
-        simpanDanSiarkan();
-        renderDropdownKategoriAlat(); 
-      }
-    }
-  });
-}
-
-document.getElementById('checkInputMassal').addEventListener('change', (e) => {
-  const wrapperBiasa = document.getElementById('wrapperStokBiasa');
-  const wrapperMassal = document.getElementById('wrapperJumlahMassal');
-  if (e.target.checked) { wrapperBiasa.classList.add('hidden'); wrapperMassal.classList.remove('hidden'); }
-  else { wrapperBiasa.classList.remove('hidden'); wrapperMassal.classList.add('hidden'); }
-});
-
-// SUBMIT DATA FORM LOGISTIK BARU (FIXED ASYNC INTERACTION)
-document.getElementById('formBarang').addEventListener('submit', async (e) => {
+function tambahBarangBaru(e) {
   e.preventDefault();
-  const nama = document.getElementById('inputNama').value;
-  const rak = document.getElementById('inputRak').value; 
-  const fileFoto = document.getElementById('inputFoto').files[0];
-  const aktifKartu = document.getElementById('inputAktifKartu').value;
-  const aktifKuota = document.getElementById('inputAktifKuota').value;
-  const isMassal = document.getElementById('checkInputMassal').checked;
+  const nama = document.getElementById("pNama").value;
+  const rak = document.getElementById("pRak").value;
+  const stok = parseInt(document.getElementById("pStok").value) || 0;
+  const hargaBeli = parseInt(document.getElementById("pHargaBeli").value) || 0;
+  const hargaJual = parseInt(document.getElementById("pHargaJual").value) || 0;
+  const fileFoto = document.getElementById("pFoto").files[0];
 
-  if (!nama || nama.trim() === "") return;
-
-  const eksekusiSimpan = async (fotoUrl) => {
-    if (isMassal) {
-      const jumlahKartu = Number(document.getElementById('inputJumlahMassal').value) || 1;
-      for (let i = 1; i <= jumlahKartu; i++) {
-        products.push({ id: (Date.now() + i).toString(), nama: `${nama} - ${i}`, rak, stok: 1, minimalStok: 0, foto: fotoUrl, aktifKartu, aktifKuota });
-      }
-      catatAktivitas(`Massal: Menambahkan ${jumlahKartu} kartu baru "${nama}"`);
-    } else {
-      const stok = Number(document.getElementById('inputStok').value);
-      const minimalStok = Number(document.getElementById('inputMin').value);
-      products.push({ id: Date.now().toString(), nama, rak, stok, minimalStok, foto: fotoUrl, aktifKartu, aktifKuota });
-      catatAktivitas(`Menambahkan item baru "${nama}"`);
-      if (stok <= minimalStok) mainkanSuaraAlarm();
-    }
-    
-    // SINKRONISASI KE SERVER TERLEBIH DAHULU SEBELUM FORM DI-RESET
-    await simpanDanSiarkan();
-    
-    e.target.reset();
-    document.getElementById('wrapperStokBiasa').classList.remove('hidden');
-    document.getElementById('wrapperJumlahMassal').classList.add('hidden');
+  const prosesSimpan = (fotoBase64) => {
+    products.push({ nama, rak, stok, hargaBeli, hargaJual, foto: fotoBase64 });
+    tulisLog(`Menambahkan barang baru: ${nama} sebanyak ${stok} unit di ${rak}`);
+    document.getElementById("formTambahBarang").reset();
+    simpanDanSiarkan();
+    tampilkanNotifikasi("Barang baru berhasil ditambahkan!", "success");
   };
 
   if (fileFoto) {
     const reader = new FileReader();
-    reader.onload = async function(event) { await eksekusiSimpan(event.target.result); };
+    reader.onloadend = () => prosesSimpan(reader.result);
     reader.readAsDataURL(fileFoto);
   } else {
-    await eksekusiSimpan(placeholderImg);
+    prosesSimpan("");
   }
-});
+}
 
-// SUBMIT DATA FORM PERALATAN BARU (FIXED ASYNC INTERACTION)
-document.getElementById('formPeralatan').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const nama = document.getElementById('inputNamaAlat').value;
-  const kategori = document.getElementById('inputKategoriAlat').value;
-  const stok = Number(document.getElementById('inputStokAlat').value) || 0;
-  const kondisi = document.getElementById('inputKondisiAlat').value;
-  const lantai = document.getElementById('inputLantaiAlat').value;
-  const rak = document.getElementById('inputRakAlat').value; 
-
-  const alatBaru = { id: 'alat-' + Date.now(), nama, kategori, stok, kondisi, lantai, rak };
-  tools.push(alatBaru);
-  catatAktivitas(`🛠️ Menambahkan alat baru "${nama}" (${stok} Unit) di [${lantai} - ${rak}]`);
-  
-  // KUNCI LANGSUNG KE FILE DATABASE.JSON SERVER
-  await simpanDanSiarkan();
-  
-  e.target.reset();
-});
-
-// EVENT AKSI TABEL LOGISTIK (TAMBAH, KURANG, ALASAN STOK, HAPUS)
-document.getElementById('tabelBodi').addEventListener('click', (e) => {
-  const tombol = e.target.closest('button');
-  if (!tombol) return;
-  const aksi = tombol.getAttribute('data-aksi');
-  const id = tombol.getAttribute('data-id');
-  const itemTerpilih = products.find(p => p.id === id);
-  if (!itemTerpilled) return;
-
-  if (aksi === 'hapus') {
-    if (confirm(`Hapus "${itemTerpilih.nama}"?`)) {
-      catatAktivitas(`Menghapus produk "${itemTerpilih.nama}"`);
-      products = products.filter(item => item.id !== id);
-      simpanDanSiarkan();
-    }
+function ubahStokBarang(index, jumlah) {
+  const p = products[index];
+  if (p.stok + jumlah < 0) {
+    tampilkanNotifikasi("Stok tidak boleh minus!", "error");
     return;
   }
-
-  let pembatalanAksi = false;
-  let catatanLogTambahan = "";
-  if (aksi === 'kurang') {
-    const alasan = prompt(`Keterangan alasan pengurangan stok "${itemTerpilih.nama}":`);
-    if (alasan === null || alasan.trim() === "") {
-      alert("⚠️ Pengurangan dibatalkan, keterangan wajib diisi.");
-      pembatalanAksi = true;
-    } else {
-      catatanLogTambahan = ` [Ket: ${alasan.trim()}]`;
-    }
-  }
-  if (pembatalanAksi) return;
-
-  products = products.map(item => {
-    if (item.id === id) {
-      let stokBaru = item.stok;
-      if (aksi === 'tambah') { stokBaru += 1; catatAktivitas(`Stok "${item.nama}" naik -> ${stokBaru}`); }
-      if (aksi === 'kurang') {
-        stokBaru = Math.max(0, item.stok - 1);
-        catatAktivitas(`Stok "${item.nama}" turun -> ${stokBaru}.${catatanLogTambahan}`);
-        if (stokBaru <= item.minimalStok) mainkanSuaraAlarm();
-      }
-      return { ...item, stok: stokBaru };
-    }
-    return item;
-  });
+  p.stok += jumlah;
+  tulisLog(`Mengubah stok ${p.nama}: ${jumlah > 0 ? '+' : ''}${jumlah} (Stok sekarang: ${p.stok})`);
   simpanDanSiarkan();
-});
+}
 
-// EVENT AKSI TABEL PERALATAN (EDIT PENSIL LANTAI & EDIT PENSIL KATEGORI)
-document.getElementById('tabelPeralatanBodi').addEventListener('click', (e) => {
-  const tombolHapus = e.target.closest('.btn-hapus-alat');
-  if (tombolHapus) {
-    const id = tombolHapus.getAttribute('data-id');
-    const alatTerpilih = tools.find(t => t.id === id);
-    if (!alatTerpilih) return;
-
-    if (confirm(`Hapus peralatan "${alatTerpilih.nama}" dari inventaris kerja?`)) {
-      catatAktivitas(`🛠️ Menghapus peralatan kerja "${alatTerpilih.nama}"`);
-      tools = tools.filter(t => t.id !== id);
-      simpanDanSiarkan();
-    }
-    return;
-  }
-
-  const tombolEditLantai = e.target.closest('.btn-edit-lantai');
-  if (tombolEditLantai) {
-    const id = tombolEditLantai.getAttribute('data-id');
-    const alatTerpilih = tools.find(t => t.id === id);
-    if (!alatTerpilih) return;
-
-    const lantaiSekarang = alatTerpilih.lantai || 'Lantai 1';
-    const menuPrompt = prompt(
-      `⚙️ PINDAHKAN LOKASI LANTAI\n\nAlat: "${alatTerpilih.nama}"\nPosisi Saat Ini: ${lantaiSekarang}\n\nKetik '1' untuk pindah ke Lantai 1\nKetik '2' untuk pindah ke Lantai 2`
-    );
-
-    if (menuPrompt === '1') {
-      if (alatTerpilih.lantai === 'Lantai 1') { alert("Peralatan memang sudah berada di Lantai 1."); return; }
-      alatTerpilih.lantai = 'Lantai 1';
-      catatAktivitas(`🛠️ Memindahkan "${alatTerpilih.nama}" ke Lantai 1`);
-      simpanDanSiarkan();
-    } else if (menuPrompt === '2') {
-      if (alatTerpilih.lantai === 'Lantai 2') { alert("Peralatan memang sudah berada di Lantai 2."); return; }
-      alatTerpilih.lantai = 'Lantai 2';
-      catatAktivitas(`🛠️ Memindahkan "${alatTerpilih.nama}" ke Lantai 2`);
-      simpanDanSiarkan();
-    }
-    return;
-  }
-
-  const tombolEditKategori = e.target.closest('.btn-edit-kategori');
-  if (tombolEditKategori) {
-    const id = tombolEditKategori.getAttribute('data-id');
-    const alatTerpilih = tools.find(t => t.id === id);
-    if (!alatTerpilih) return;
-
-    let promptTeks = `⚙️ UBAH KATEGORI PERALATAN\n\nAlat: "${alatTerpilih.nama}"\nKategori Saat Ini: ${alatTerpilih.kategori}\n\nKetik nomor kategori tujuan:\n`;
-    listKategoriAlat.forEach((kat, idx) => { promptTeks += `${idx + 1}. ${kat}\n`; });
-
-    const pilihanIdx = prompt(promptTeks);
-    if (pilihanIdx !== null) {
-      const nomorUbah = parseInt(pilihanIdx.trim()) - 1;
-      if (nomorUbah >= 0 && nomorUbah < listKategoriAlat.length) {
-        const kategoriBaru = listKategoriAlat[nomorUbah];
-        if (alatTerpilih.kategori === kategoriBaru) return;
-        const kategoriLama = alatTerpilih.kategori;
-        alatTerpilih.kategori = kategoriBaru;
-        catatAktivitas(`🛠️ Mengubah kategori "${alatTerpilih.nama}" dari "${kategoriLama}" ke "${kategoriBaru}"`);
-        simpanDanSiarkan();
-      }
-    }
-  }
-});
-
-document.getElementById('btnBersihkanLog').addEventListener('click', () => {
-  if (prompt("🔐 Masukkan password admin:") === ADMIN_PASSWORD) {
-    logs = [{ teks: "Log dibersihkan oleh Admin Utama.", waktu: `${new Date().toLocaleDateString('id-ID')} ${new Date().toLocaleTimeString('id-ID')}` }];
+function hapusBarang(index) {
+  if (confirm(`Hapus ${products[index].nama} dari database?`)) {
+    tulisLog(`Menghapus barang: ${products[index].nama}`);
+    products.splice(index, 1);
     simpanDanSiarkan();
-  } else {
-    alert("❌ Password Salah!");
+    tampilkanNotifikasi("Barang berhasil dihapus.", "info");
   }
-});
+}
 
-document.getElementById('btnDownloadExcel').addEventListener('click', () => {
-  const barisExcel = [["WAKTU", "AKTIVITAS / PERUBAHAN SISTEM", "KETERANGAN PENGGUNAAN"]];
-  logs.forEach(log => {
-    let teksAktivitas = log.teks;
-    let teksKeterangan = "-";
-    const regexKet = /\[Ket:\s*(.*?)\]/;
-    const cocok = teksAktivitas.match(regexKet);
-    if (cocok) { teksKeterangan = cocok[1]; teksAktivitas = teksAktivitas.replace(regexKet, "").trim(); }
-    barisExcel.push([log.waktu, teksAktivitas, teksKeterangan]);
+
+// ==========================================================================
+// SEKTOR 4: MANAJEMEN ALAT KERJA / INVENTARIS IT
+// ==========================================================================
+function renderTabelAlat() {
+  const tbody = document.getElementById("tbodyAlat");
+  if (!tbody) return;
+  tbody.innerHTML = "";
+
+  tools.forEach((t, index) => {
+    const tr = document.createElement("tr");
+    tr.className = "border-b hover:bg-slate-50 text-sm text-slate-700";
+    tr.innerHTML = `
+      <td class="p-3 text-center">${index + 1}</td>
+      <td class="p-3 font-semibold text-slate-900">${t.nama}</td>
+      <td class="p-3 text-center"><span class="px-2 py-1 bg-blue-50 text-blue-700 rounded text-xs font-medium">${t.kategori}</span></td>
+      <td class="p-3 text-center font-bold text-blue-600">${t.jumlah}</td>
+      <td class="p-3 text-center">
+        <span class="px-2 py-1 rounded text-xs font-semibold ${t.status === 'Tersedia' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}">
+          ${t.status}
+        </span>
+      </td>
+      <td class="p-3 text-slate-500 text-xs">${t.keterangan || "-"}</td>
+      <td class="p-3 text-center">
+        <div class="flex justify-center gap-1">
+          <button onclick="ubahStatusAlat(${index})" class="px-2 py-1 bg-blue-500 hover:bg-blue-600 text-white rounded text-xs font-medium">Ubah Status</button>
+          <button onclick="hapusAlat(${index})" class="px-2 py-1 bg-rose-500 hover:bg-rose-600 text-white rounded text-xs font-medium">Hapus</button>
+        </div>
+      </td>
+    `;
+    tbody.appendChild(tr);
   });
-  const lembarKerja = XLSX.utils.aoa_to_sheet(barisExcel);
-  const bukuKerja = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(bukuKerja, lembarKerja, "Log Aktivitas");
-  XLSX.writeFile(bukuKerja, `Log_Gudang_${new Date().toISOString().slice(0,10)}.xlsx`);
-});
+}
 
-// MONITORING COUNTDOWN KADALUARSA TIAP 1 DETIK
-setInterval(() => {
-  if (isLoggedIn) {
-    renderAplikasi();
+function tambahAlatBaru(e) {
+  e.preventDefault();
+  const nama = document.getElementById("tNama").value;
+  const kategori = document.getElementById("tKategori").value;
+  const jumlah = parseInt(document.getElementById("tJumlah").value) || 0;
+  const status = document.getElementById("tStatus").value;
+  const keterangan = document.getElementById("tKeterangan").value;
+
+  tools.push({ nama, kategori, jumlah, status, keterangan });
+  tulisLog(`Menambahkan aset alat: ${nama} (${jumlah} unit) - Status: ${status}`);
+  document.getElementById("formTambahAlat").reset();
+  simpanDanSiarkan();
+  tampilkanNotifikasi("Alat kerja berhasil didaftarkan!", "success");
+}
+
+function ubahStatusAlat(index) {
+  const t = tools[index];
+  t.status = t.status === "Tersedia" ? "Dipinjam/Dipakai" : "Tersedia";
+  tulisLog(`Mengubah status alat ${t.nama} menjadi: ${t.status}`);
+  simpanDanSiarkan();
+}
+
+function hapusAlat(index) {
+  if (confirm(`Hapus alat ${tools[index].nama}?`)) {
+    tulisLog(`Menghapus alat: ${tools[index].nama}`);
+    tools.splice(index, 1);
+    simpanDanSiarkan();
+    tampilkanNotifikasi("Alat berhasil dihapus.", "info");
   }
-}, 1000);
+}
 
-// INISIALISASI MESIN UTAMA SAAT PERTAMA KALI DIBUKA
-aturVisibilitasHalaman();
+
+// ==========================================================================
+// SEKTOR 5: DASHBOARD ANALYTICS & LOGIC KALKULASI PENGELUARAN OPERASIONAL
+// ==========================================================================
+function renderDashboard() {
+  // Ambil nilai pengeluaran operasional dari LocalStorage (bersifat dinamis per perangkat/sesi kerja)
+  const biayaTenagaKerja = parseInt(localStorage.getItem("ops_tenaga_kerja")) || 0;
+  const biayaTransport = parseInt(localStorage.getItem("ops_transport")) || 0;
+
+  // Set nilai input agar tidak hilang saat halaman di-refresh
+  if (document.getElementById("inputTenagaKerja")) document.getElementById("inputTenagaKerja").value = biayaTenagaKerja;
+  if (document.getElementById("inputTransport")) document.getElementById("inputTransport").value = biayaTransport;
+
+  let totalStokBarang = 0;
+  let totalAsetAlat = 0;
+  let akumulasiModalBeli = 0;
+  let akumulasiOmzetJual = 0;
+
+  products.forEach(p => {
+    totalStokBarang += p.stok;
+    akumulasiModalBeli += (p.stok * p.hargaBeli);
+    akumulasiOmzetJual += (p.stok * p.hargaJual);
+  });
+
+  tools.forEach(t => {
+    totalAsetAlat += t.jumlah;
+  });
+
+  // Perhitungan Keuntungan Kotor dan Keuntungan Bersih (Dikurangi Biaya Tenaga Kerja & Transportasi)
+  const untungKotor = akumulasiOmzetJual - akumulasiModalBeli;
+  const totalPengeluaranTambahan = biayaTenagaKerja + biayaTransport;
+  const untungBersih = untungKotor - totalPengeluaranTambahan;
+
+  // Suntik Nilai ke Elemen Dashboard Ringkasan
+  if (document.getElementById("dashStokBarang")) document.getElementById("dashStokBarang").innerText = totalStokBarang.toLocaleString();
+  if (document.getElementById("dashTotalAlat")) document.getElementById("dashTotalAlat").innerText = totalAsetAlat.toLocaleString();
+  if (document.getElementById("dashModalBeli")) document.getElementById("dashModalBeli").innerText = "Rp " + akumulasiModalBeli.toLocaleString();
+  
+  const elUntungBersih = document.getElementById("dashUntungBersih");
+  if (elUntungBersih) {
+    elUntungBersih.innerText = "Rp " + untungBersih.toLocaleString();
+    if (untungBersih < 0) {
+      elUntungBersih.className = "text-2xl font-bold text-rose-600";
+    } else {
+      elUntungBersih.className = "text-2xl font-bold text-emerald-600";
+    }
+  }
+}
+
+// Fungsi Trigger Saat Mengubah Nilai Input Pengeluaran Tenaga Kerja & Transport
+function hitungUlangOperasional() {
+  const biayaTenagaKerja = parseInt(document.getElementById("inputTenagaKerja").value) || 0;
+  const biayaTransport = parseInt(document.getElementById("inputTransport").value) || 0;
+
+  // Kunci ke penyimpanan lokal agar persisten
+  localStorage.setItem("ops_tenaga_kerja", biayaTenagaKerja);
+  localStorage.setItem("ops_transport", biayaTransport);
+
+  // Kalkulasi ulang seluruh layar utama
+  renderDashboard();
+  tampilkanNotifikasi("Biaya operasional diperbarui!", "info");
+}
+
+
+// ==========================================================================
+// SEKTOR 6: RIWAYAT AKTIVITAS & PANEL PENGATURAN DATA RAK
+// ==========================================================================
+function tulisLog(pesan) {
+  const waktu = new Date().toLocaleString("id-ID", { timeZone: "Asia/Jakarta" });
+  logs.unshift({ waktu, pesan });
+  
+  // Batasi agar riwayat log cloud tidak membengkak terlalu besar (Max 150 baris)
+  if (logs.length > 150) logs.pop();
+}
+
+function renderRiwayatLog() {
+  const container = document.getElementById("containerLog");
+  if (!container) return;
+  container.innerHTML = "";
+
+  if (logs.length === 0) {
+    container.innerHTML = `<p class="text-slate-400 text-sm italic">Belum ada riwayat aktivitas gudang.</p>`;
+    return;
+  }
+
+  logs.forEach(l => {
+    const div = document.createElement("div");
+    div.className = "p-2 border-b border-slate-100 text-xs text-slate-600 flex justify-between gap-4 hover:bg-slate-50";
+    div.innerHTML = `
+      <span class="font-medium text-slate-800">${l.pesan}</span>
+      <span class="text-slate-400 shrink-0">${l.waktu}</span>
+    `;
+    container.appendChild(div);
+  });
+}
+
+function renderOpsiPengaturan() {
+  // Update pilihan lokasi Rak pada Dropdown Form Tambah Barang
+  const pRakSelect = document.getElementById("pRak");
+  if (pRakSelect) {
+    pRakSelect.innerHTML = "";
+    listRak.forEach(rak => {
+      pRakSelect.innerHTML += `<option value="${rak}">${rak}</option>`;
+    });
+  }
+
+  // Update pilihan Kategori Alat pada Dropdown Form Tambah Alat
+  const tKategoriSelect = document.getElementById("tKategori");
+  if (tKategoriSelect) {
+    tKategoriSelect.innerHTML = "";
+    listKategoriAlat.forEach(kat => {
+      tKategoriSelect.innerHTML += `<option value="${kat}">${kat}</option>`;
+    });
+  }
+
+  // Render Daftar List Manajemen Rak di Tab Pengaturan
+  const listRakContainer = document.getElementById("listRakPengaturan");
+  if (listRakContainer) {
+    listRakContainer.innerHTML = "";
+    listRak.forEach((rak, idx) => {
+      listRakContainer.innerHTML += `
+        <div class="flex justify-between items-center bg-slate-50 p-2 border rounded mb-1 text-sm">
+          <span>${rak}</span>
+          <button onclick="hapusOpsiPengaturan('rak', ${idx})" class="text-rose-500 font-bold hover:text-rose-700">×</button>
+        </div>
+      `;
+    });
+  }
+}
+
+function tambahOpsiPengaturan(jenis) {
+  if (jenis === 'rak') {
+    const input = document.getElementById("inputRakBaru");
+    const nilai = input.value.trim();
+    if (nilai && !listRak.includes(nilai)) {
+      listRak.push(nilai);
+      input.value = "";
+      tulisLog(`Menambahkan opsi lokasi rak baru: ${nilai}`);
+      simpanDanSiarkan();
+    }
+  }
+}
+
+function hapusOpsiPengaturan(jenis, idx) {
+  if (jenis === 'rak') {
+    tulisLog(`Menghapus opsi lokasi rak: ${listRak[idx]}`);
+    listRak.splice(idx, 1);
+    simpanDanSiarkan();
+  }
+}
+
+function bersihkanSeluruhLog() {
+  if (confirm("Apakah Anda yakin ingin menghapus seluruh riwayat log aktivitas?")) {
+    logs = [];
+    tulisLog("Riwayat log aktivitas telah dibersihkan oleh Admin.");
+    simpanDanSiarkan();
+    tampilkanNotifikasi("Seluruh riwayat log dibersihkan.", "info");
+  }
+}
+
+
+// ==========================================================================
+// SEKTOR 7: FITUR CETAK LAPORAN LAPORAN (PRINT PREVIEW)
+// ==========================================================================
+function cetakLaporanGudang() {
+  const w = window.open();
+  let barisBarang = "";
+  let akumulasiModal = 0;
+  let akumulasiOmzet = 0;
+
+  products.forEach((p, idx) => {
+    const modal = p.stok * p.hargaBeli;
+    const omzet = p.stok * p.hargaJual;
+    akumulasiModal += modal;
+    akumulasiOmzet += omzet;
+
+    barisBarang += `
+      <tr>
+        <td style="text-align:center">${idx+1}</td>
+        <td>${p.nama}</td>
+        <td>${p.rak}</td>
+        <td style="text-align:center">${p.stok}</td>
+        <td style="text-align:right">Rp ${p.hargaBeli.toLocaleString()}</td>
+        <td style="text-align:right">Rp ${p.hargaJual.toLocaleString()}</td>
+        <td style="text-align:right">Rp ${(omzet - modal).toLocaleString()}</td>
+      </tr>
+    `;
+  });
+
+  const bTenaga = parseInt(localStorage.getItem("ops_tenaga_kerja")) || 0;
+  const bTransport = parseInt(localStorage.getItem("ops_transport")) || 0;
+  const untungBersih = (akumulasiOmzet - akumulasiModal) - (bTenaga + bTransport);
+
+  w.document.write(`
+    <html>
+    <head>
+      <title>Laporan Inventaris Hijrah Agro Mandiri</title>
+      <style>
+        body { font-family: sans-serif; padding: 20px; color: #333; }
+        h2 { margin-bottom: 5px; color: #047857; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; font-size: 13px; }
+        th { bg-color: #f4f4f5; font-weight: bold; }
+        .ringkasan { margin-top: 30px; float: right; width: 350px; }
+        .ringkasan table td { border: none; padding: 4px; font-size: 14px; }
+      </style>
+    </head>
+    <body>
+      <h2>LAPORAN DATA INVENTARIS GUDANG</h2>
+      <p style="font-size:12px; color:#666; margin-top:0;">Dicetak pada: ${new Date().toLocaleString('id-ID')}</p>
+      
+      <table>
+        <thead>
+          <tr>
+            <th>No</th>
+            <th>Nama Barang</th>
+            <th>Lokasi Rak</th>
+            <th>Stok</th>
+            <th>Harga Beli</th>
+            <th>Harga Jual</th>
+            <th>Estimasi Profit</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${barisBarang || '<tr><td colspan="7" style="text-align:center">Data barang kosong</td></tr>'}
+        </tbody>
+      </table>
+
+      <div class="ringkasan">
+        <table>
+          <tr><td>Total Nilai Aset (Modal)</td><td>:</td><td style="text-align:right">Rp ${akumulasiModal.toLocaleString()}</td></tr>
+          <tr><td>Estimasi Omzet Kotor</td><td>:</td><td style="text-align:right">Rp ${akumulasiOmzet.toLocaleString()}</td></tr>
+          <tr><td>Biaya Tenaga Kerja</td><td>:</td><td style="text-align:right; color:#e11d48">- Rp ${bTenaga.toLocaleString()}</td></tr>
+          <tr><td>Biaya Transportasi</td><td>:</td><td style="text-align:right; color:#e11d48">- Rp ${bTransport.toLocaleString()}</td></tr>
+          <tr style="font-weight:bold; font-size:16px; color:#047857;">
+            <td>Keuntungan Bersih</td><td>:</td><td style="text-align:right">Rp ${untungBersih.toLocaleString()}</td></tr>
+        </table>
+      </div>
+
+      <script>window.print();</script>
+    </body>
+    </html>
+  `);
+  w.document.close();
+}
+
+
+// ==========================================================================
+// SEKTOR 8: UI NOTIFIKASI TOAST & INITIALIZATION RUNNER
+// ==========================================================================
+function tampilkanNotifikasi(pesan, tipe = "info") {
+  const wadah = document.getElementById("wadahToast") || createToastContainer();
+  const toast = document.createElement("div");
+  
+  let bgClass = "bg-slate-800";
+  if (tipe === "success") bgClass = "bg-emerald-600";
+  if (tipe === "error") bgClass = "bg-rose-600";
+  if (tipe === "info") bgClass = "bg-blue-600";
+
+  toast.className = `${bgClass} text-white text-sm px-4 py-3 rounded-xl shadow-lg transition-all duration-300 transform translate-y-2 opacity-0 flex items-center gap-2`;
+  toast.innerText = pesan;
+
+  wadah.appendChild(toast);
+
+  setTimeout(() => {
+    toast.classList.remove("translate-y-2", "opacity-0");
+  }, 10);
+
+  setTimeout(() => {
+    toast.classList.add("translate-y-2", "opacity-0");
+    setTimeout(() => toast.remove(), 300);
+  }, 3500);
+}
+
+function createToastContainer() {
+  const container = document.createElement("div");
+  container.id = "wadahToast";
+  container.className = "fixed bottom-5 right-5 z-50 flex flex-col gap-2";
+  document.body.appendChild(container);
+  return container;
+}
+
+// Inisialisasi Aplikasi Saat Browser Selesai Dimuat
+document.addEventListener("DOMContentLoaded", function () {
+  // Pasang trigger event ke submit form
+  const fBarang = document.getElementById("formTambahBarang");
+  if (fBarang) fBarang.addEventListener("submit", tambahBarangBaru);
+
+  const fAlat = document.getElementById("formTambahAlat");
+  if (fAlat) fAlat.addEventListener("submit", tambahAlatBaru);
+
+  // Jalankan routing halaman
+  aturVisibilitasHalaman();
+});
